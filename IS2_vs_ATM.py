@@ -80,6 +80,8 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
     EN=EN[ind_50m,:]
 	# elevation of Qfit data
     z=Qdata.elevation[ind_50m].astype(np.float64)
+    # cross track position
+    scan_XT=Qdata.scan_XT[ind_50m]
 
     # calculate along-track vector and the across-track vector
     this_az=D6i.seg_azimuth[0]
@@ -115,7 +117,7 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
     this_out['N_50m']=np.sum(ind_50m)
     this_out['dz_50m']=D6i.h_li-m[0]
     this_out['RDE_50m']=sigma_hat
-    this_out['scan_XT_50m']=np.nanmean(Qdata.scan_XT[ind_50m])
+    this_out['scan_XT_50m']=np.nanmean(scan_XT)
 
     ind_20m=np.sum(EN**2,axis=1)<20**2
     if np.sum(ind_20m)> 5:
@@ -132,7 +134,7 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
     this_out['dz_seg']=D6i.h_li-m[0]
     this_out['RDE_seg']=sigma_hat
     this_out['beam_pair']=D6i.BP
-    this_out['scan_XT_seg']=np.nanmean(Qdata.scan_XT[sub_seg])
+    this_out['scan_XT_seg']=np.nanmean(scan_XT[sub_seg])
     this_out['t_qfit']=np.nanmean(Qdata.days_J2k[ind_50m])
     this_out['y_seg_mean']=np.nanmean(xy_at[sub_seg,1])
     this_out['x_seg_mean']=np.nanmean(xy_at[sub_seg,0])
@@ -213,7 +215,7 @@ out_fields=[
     'dh_fit_dx','N_50m','N_seg','h_qfit_seg','dh_qfit_dx','dh_qfit_dy',
     'h_robust_sprd', 'snr_significance',
     'h_qfit_50m','sigma_qfit_50m', 'sigma_seg','dz_50m','E_seg','RDE_seg',
-    'scan_XT_50m','hbar_20m',
+    'scan_XT_50m','scan_XT_seg','hbar_20m',
     'RDE_50m','t_seg','t_qfit','y_atc', 'x_seg_mean', 'y_seg_mean']
 out_template={f:np.NaN for f in out_fields}
 out=list()
