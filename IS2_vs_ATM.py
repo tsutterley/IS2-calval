@@ -16,6 +16,7 @@ import pointCollection as pc
 from ATL11.RDE import RDE
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 import h5py
 import os
 import re
@@ -197,8 +198,12 @@ Q_full=blockmedian_for_qsub(Q_full, 5)
 # fit scan parameters to an ATM data structure
 Q_full=fit_ATM_data(Q_full)
 # construct search tree from ATM Qfit coords
-Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
-# could pickle Qtree here to save computational time for future runs
+# pickle Qtree to save computational time for future runs
+if os.path.isfile(os.path.join(ATM_dir,'tree.p')):
+    Qtree = pickle.load(open(os.path.join(ATM_dir,'tree.p'),'rb'))
+else:
+    Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
+    pickle.dump(Qtree,open(os.path.join(ATM_dir,'tree.p'),'wb'))
 
 # read 10 km ATL06 index
 D6_GI=pc.geoIndex(SRS_proj4=SRS_proj4).from_file(ATL06_index, read_file=True)
