@@ -45,14 +45,14 @@ def my_lsfit(G, d):
     return m, R, sigma_hat
 
 def blockmedian_for_gps(GPS, delta):
-    # make a subset of the qfit data that contains the blockmedian elevation values
+    # make a subset of the GPS data that contains the blockmedian elevation values
 
     lat0=np.nanmedian(GPS.latitude)
     lon0=np.nanmedian(GPS.longitude)
     # calculate the ellipsoid radius for the current point
     Re=WGS84a**2/np.sqrt((WGS84a*np.cos(d2r*lat0))**2+(WGS84b*np.sin(d2r*lat0))**2)
     delta_lon=np.mod(GPS.longitude-lon0+180.,360.)-180
-    # project the Qfit latitude and longitude into northing and easting
+    # project the GPS latitude and longitude into northing and easting
     EN=Re*np.c_[delta_lon*np.cos(d2r*lat0), (GPS.latitude-lat0)]*np.pi/180.
     z=GPS.z.astype(np.float64)
     xm, ym, zm, ind=pt_blockmedian(EN[:,0], EN[:,1], z, delta, return_index=True);#, randomize_evens=True)
@@ -181,7 +181,7 @@ qradius = 100
 # read GPS HDF5 file
 GPS_field_dict = {None:['latitude','longitude','z']}
 GPS=pc.data().from_h5(GPS_file,field_dict=GPS_field_dict).get_xy(SRS_proj4)
-# run block median for qsub over GPS data
+# run block median over GPS data
 GPS=blockmedian_for_gps(GPS, 5)
 
 # read all Qfit files within ATM directory
