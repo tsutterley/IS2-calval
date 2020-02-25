@@ -13,20 +13,22 @@ Created on Wed Sep  5 13:36:08 2018
 import pointCollection as pc
 #from PointDatabase import ATL06_filters
 from ATL11.RDE import RDE
-import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import h5py
 import os
 import re
 import sys
+import argparse
 #from ATL11.pt_blockmedian import pt_blockmedian
 from PointDatabase import pt_blockmedian
 from ATM_waveform.fit_ATM_scan import fit_ATM_data
 from sklearn.neighbors import KDTree
 
-DOPLOT=False
-VERBOSE=True
+# WGS84 semimajor and semiminor axes
+WGS84a=6378137.0
+WGS84b=6356752.31424
+d2r=np.pi/180.
 
 def my_lsfit(G, d):
     try:
@@ -97,10 +99,11 @@ def compare_gps_with_qfit(GPSsub, Qdata, out_template):
     if np.sum(ind_50m) < 10:
         return None
     EN=EN[ind_50m,:]
-	# elevation of Qfit data
+    # elevation of Qfit data
     z=Qdata.elevation[ind_50m].astype(np.float64)
     # cross track position
-    scan_XT=Qdata.scan_XT[ind_50m]
+    if 'scan_XT' in Qdata.fields:
+        scan_XT=Qdata.scan_XT[ind_50m]
 
     # convert into local polar stereo as a function of distance from point
     xy_local = np.c_[Qdata.x[ind_50m] - GPSsub.x, Qdata.y[ind_50m] - GPSsub.y]
@@ -127,8 +130,10 @@ def compare_gps_with_qfit(GPSsub, Qdata, out_template):
     this_out['N_50m']=np.sum(ind_50m)
     this_out['dz_50m'],=np.array(GPSsub.z-m[0],dtype=np.float64)
     this_out['RDE_50m']=sigma_hat
-    this_out['scan_XT_50m']=np.nanmean(scan_XT)
     this_out['t_qfit']=np.nanmean(Qdata.days_J2k[ind_50m])
+    # if running the scan program
+    if 'scan_XT' in Qdata.fields:
+        this_out['scan_XT_50m']=np.nanmean(scan_XT)
 
     ind_20m=np.sum(EN**2,axis=1)<20**2
     if (np.sum(ind_20m) > 5):
@@ -143,92 +148,118 @@ def compare_gps_with_qfit(GPSsub, Qdata, out_template):
         this_out['N_10m']=np.sum(sub_10m)
         this_out['dz_10m'],=np.array(GPSsub.z-m[0],dtype=np.float64)
         this_out['RDE_10m']=sigma_hat
-        this_out['scan_XT_10m']=np.nanmean(scan_XT[sub_10m])
         this_out['y_10m_mean']=np.nanmean(xy_local[sub_10m,1])
         this_out['x_10m_mean']=np.nanmean(xy_local[sub_10m,0])
+        # if running the scan program
+        if 'scan_XT' in Qdata.fields:
+            this_out['scan_XT_10m']=np.nanmean(scan_XT[sub_10m])
 
     # return the output dictionary
     return this_out
 
+def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--gps','-G', type=str, help="GPS file to run")
+    parser.add_argument('--atm', '-A', type=str,  help='ATM directory to run')
+    parser.add_argument('--hemisphere','-H', type=int, default=-1, help='hemisphere, must be 1 or -1')
+    parser.add_argument('--query','-Q', type=float, default=100, help='KD-Tree query radius')
+    parser.add_argument('--median','-M', default=False, action='store_true', help='Run block median')
+    parser.add_argument('--scan','-S', default=False, action='store_true', help='Run ATM scan fit')
+    parser.add_argument('--verbose','-v', default=False, action='store_true', help='verbose output of run')
+    args=parser.parse_args()
 
-GPS_file=os.path.expanduser(sys.argv[1])
-fileBasename, fileExtension = os.path.splitext(GPS_file)
-ATM_dir=os.path.expanduser(sys.argv[2])
+    if args.hemisphere==1:
+        SRS_proj4 = '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
+    elif args.hemisphere==-1:
+        SRS_proj4 = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
 
-print("working on GPS file {0}, ATM directory {1}".format(GPS_file, ATM_dir)) if VERBOSE else None
+    # tilde expansion of file arguments
+    GPS_file=os.path.expanduser(args.gps)
+    fileBasename, fileExtension = os.path.splitext(GPS_file)
+    ATM_dir=os.path.expanduser(args.atm)
 
-# find Qfit files within ATM_dir
-Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
-Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
+    print("working on GPS file {0}, ATM directory {1}".format(GPS_file, ATM_dir)) if args.verbose else None
 
-# output directory
-out_dir=os.path.join(ATM_dir,'xovers')
-if not os.path.isdir(out_dir):
-    os.mkdir(out_dir)
+    # find Qfit files within ATM_dir
+    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
+    Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
 
-out_file = 'vs_{0}.h5'.format(os.path.basename(fileBasename))
-if os.path.isfile(os.path.join(out_dir,out_file)):
-    print("found: {0}".format(os.path.join(out_dir,out_file))) if VERBOSE else None
+    # output directory
+    out_dir=os.path.join(ATM_dir,'xovers')
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
 
-# WGS84 semimajor and semiminor axes
-WGS84a=6378137.0
-WGS84b=6356752.31424
-d2r=np.pi/180.
-SRS_proj4='+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
-# query radius for finding overlapping points
-qradius = 100
+    # output file
+    out_file = 'vs_{0}.h5'.format(os.path.basename(fileBasename))
+    # check if output file exists
+    if os.path.isfile(os.path.join(out_dir,out_file)):
+        print("found: {0}".format(os.path.join(out_dir,out_file))) if args.verbose else None
 
-# read GPS HDF5 file
-GPS_field_dict = {None:['latitude','longitude','z']}
-GPS=pc.data().from_h5(GPS_file,field_dict=GPS_field_dict).get_xy(SRS_proj4)
-# run block median over GPS data
-GPS=blockmedian_for_gps(GPS, 5)
+    # read GPS HDF5 file
+    GPS_field_dict = {None:['latitude','longitude','z']}
+    GPS=pc.data().from_h5(GPS_file,field_dict=GPS_field_dict).get_xy(SRS_proj4)
+    # run block median over GPS data
+    if args.median:
+        GPS=blockmedian_for_gps(GPS, 5)
 
-# read all Qfit files within ATM directory
-Qlist=list()
-for f in sorted(Qfit_files):
-    Qlist.append(pc.ATM_Qfit.data().from_h5(f))
-# merge the list of ATM data and build the search tree
-Q_full=pc.data().from_list(Qlist).get_xy(SRS_proj4)
-# run block median for qsub
-Q_full=blockmedian_for_qsub(Q_full, 5)
-# fit scan parameters to an ATM data structure
-Q_full=fit_ATM_data(Q_full)
-# construct search tree from ATM Qfit coords
-# pickle Qtree to save computational time for future runs
-if os.path.isfile(os.path.join(ATM_dir,'tree.p')):
-    Qtree = pickle.load(open(os.path.join(ATM_dir,'tree.p'),'rb'))
-else:
-    Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
-    pickle.dump(Qtree,open(os.path.join(ATM_dir,'tree.p'),'wb'))
+    # read all Qfit files within ATM directory
+    Qlist=list()
+    for f in sorted(Qfit_files):
+        Qlist.append(pc.ATM_Qfit.data().from_h5(f))
+    # merge the list of ATM data and build the search tree
+    Q_full=pc.data().from_list(Qlist).get_xy(SRS_proj4)
 
-# output fields
-out_fields=['x','y','z','longitude','latitude',
-    't_qfit','h_qfit_50m','sigma_qfit_50m','dz_50m','scan_XT_50m','RDE_50m','N_50m',
-    'hbar_20m','h_qfit_10m','sigma_qfit_10m','dz_10m','scan_XT_10m','RDE_10m','N_10m',
-    'x_10m_mean','y_10m_mean']
-out_template={f:np.NaN for f in out_fields}
-out=list()
+    # fit scan parameters to an ATM data structure
+    if args.scan:
+        Q_full=fit_ATM_data(Q_full)
 
-# query the search tree to find points within qradius
-Qquery = Qtree.query_radius(np.c_[GPS.x, GPS.y], qradius)
-# indices of GPS points within bin
-ind, = np.nonzero([np.any(i) for i in Qquery])
-# loop over queries in the GPS data
-for i in ind:
-    GPSsub = GPS.copy_subset(np.array([i]))
-    # grab the Qfit bins around the GPS bin
-    Qdata = Q_full.copy_subset(Qquery[i], by_row=True)
-    Qdata.index(np.isfinite(Qdata.elevation) & np.isfinite(Qdata.latitude) & np.isfinite(Qdata.longitude))
-    # create output dictionary of GPS and plane-fit ATM comparison
-    this_out = compare_gps_with_qfit(GPSsub, Qdata, out_template)
-    if this_out is not None:
-        out.append(this_out)
+    # run block median for qsub
+    if args.median:
+        Q_full=blockmedian_for_qsub(Q_full, 5)
 
-if out:
-    D=dict()
-    with h5py.File(os.path.join(out_dir,out_file),'w') as h5f:
-        for field in out[0].keys():
-            D[field]=np.array([ii[field] for ii in out])
-            print(field,D[field].dtype)
-            h5f.create_dataset(field, data=D[field])
+    # construct search tree from ATM Qfit coords
+    # pickle Qtree to save computational time for future runs
+    if os.path.isfile(os.path.join(ATM_dir,'tree.p')):
+        Qtree = pickle.load(open(os.path.join(ATM_dir,'tree.p'),'rb'))
+    else:
+        Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
+        pickle.dump(Qtree,open(os.path.join(ATM_dir,'tree.p'),'wb'))
+
+    # output fields
+    out_fields=['x','y','z','longitude','latitude',
+        't_qfit','h_qfit_50m','sigma_qfit_50m','dz_50m','RDE_50m','N_50m',
+        'hbar_20m','h_qfit_10m','sigma_qfit_10m','dz_10m','RDE_10m','N_10m',
+        'x_10m_mean','y_10m_mean']
+    # append scan fields to output template
+    if args.scan:
+        out_fields.extend(['scan_XT_50m','scan_XT_10m'])
+    out_template={f:np.NaN for f in out_fields}
+    out=list()
+
+    # query the search tree to find points within query radius
+    Qquery = Qtree.query_radius(np.c_[GPS.x, GPS.y], args.query)
+    # indices of GPS points within bin
+    ind, = np.nonzero([np.any(i) for i in Qquery])
+    # loop over queries in the GPS data
+    for i in ind:
+        GPSsub = GPS.copy_subset(np.array([i]))
+        # grab the Qfit bins around the GPS bin
+        Qdata = Q_full.copy_subset(Qquery[i], by_row=True)
+        Qdata.index(np.isfinite(Qdata.elevation) & np.isfinite(Qdata.latitude) & np.isfinite(Qdata.longitude))
+        # create output dictionary of GPS and plane-fit ATM comparison
+        this_out = compare_gps_with_qfit(GPSsub, Qdata, out_template)
+        if this_out is not None:
+            out.append(this_out)
+
+    # if there were overlapping points between the GPS and ATM data
+    if out:
+        D=dict()
+        with h5py.File(os.path.join(out_dir,out_file),'w') as h5f:
+            for field in out[0].keys():
+                D[field]=np.array([ii[field] for ii in out])
+                print(field,D[field].dtype)
+                h5f.create_dataset(field, data=D[field])
+
+# run main program
+if __name__ == '__main__':
+    main()
