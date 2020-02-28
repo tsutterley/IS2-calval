@@ -257,7 +257,7 @@ def main():
         with h5py.File(os.path.join(out_dir,out_file),'w') as h5f:
             for field in out[0].keys():
                 D[field]=np.array([ii[field] for ii in out])
-                print(field,D[field].dtype)
+                print(field,D[field].dtype) if args.verbose else None
                 h5f.create_dataset(field, data=D[field])
 
 # run main program

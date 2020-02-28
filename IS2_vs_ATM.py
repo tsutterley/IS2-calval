@@ -165,7 +165,7 @@ def main():
 
     # tilde expansion of file arguments
     ATM_dir=os.path.expanduser(args.atm)
-    print("working on ATL06 dir {0}, ATM directory {1}".format(args.atl06,  ATM_dir)) if args.verbose else None
+    print("working on ATL06 dir {0}, ATM directory {1}".format(args.atl06, ATM_dir)) if args.verbose else None
 
     # find Qfit files within ATM_dir
     Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
@@ -268,6 +268,7 @@ def main():
     with h5py.File(os.path.join(out_dir,out_file),'w') as h5f:
         for field in out[0].keys():
             D[field]=np.array([ii[field] for ii in out])
+            print(field,D[field].dtype) if args.verbose else None
             h5f.create_dataset(field, data=D[field])
 
 # run main program

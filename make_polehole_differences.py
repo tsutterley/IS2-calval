@@ -20,13 +20,16 @@ import h5py
 import os
 import re
 import sys
+import argparse
 #from ATL11.pt_blockmedian import pt_blockmedian
 from PointDatabase import pt_blockmedian
 from sklearn.neighbors import KDTree
 
-import matplotlib.pyplot as plt
-DOPLOT=False
-VERBOSE=True
+# WGS84 semimajor and semiminor axes
+WGS84a=6378137.0
+WGS84b=6356752.31424
+d2r=np.pi/180.
+delta=[10000., 10000.]
 
 def my_lsfit(G, d):
     try:
@@ -134,113 +137,119 @@ def compare_seg_with_qfit(D6i, Qdata, beam, out_template):
     # return the output dictionary
     return this_out
 
+def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--atl06','-I', type=str, help="ICESat-2 ATL06 directory to run")
+    parser.add_argument('--atm', '-A', type=str,  help='ATM directory to run')
+    parser.add_argument('--hemisphere','-H', type=int, default=-1, help='hemisphere, must be 1 or -1')
+    parser.add_argument('--query','-Q', type=float, default=100, help='KD-Tree query radius')
+    parser.add_argument('--median','-M', default=False, action='store_true', help='Run block median')
+    parser.add_argument('--verbose','-v', default=False, action='store_true', help='verbose output of run')
+    args=parser.parse_args()
 
-sigma_pulse=5.5
+    if args.hemisphere==1:
+        SRS_proj4 = '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
+    elif args.hemisphere==-1:
+        SRS_proj4 = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
 
-ATL06_dir=sys.argv[1]
-ATM_dir=os.path.expanduser(sys.argv[2])
+    # tilde expansion of file arguments
+    ATM_dir=os.path.expanduser(args.atm)
+    print("working on ATL06 dir {0}, ATM directory {1}".format(args.atl06, ATM_dir)) if args.verbose else None
 
-print("working on ATL06 dir {0}, ATM directory {1}".format(ATL06_dir,  ATM_dir)) if VERBOSE else None
+    # find Qfit files within ATM_dir
+    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
+    Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
 
-# find Qfit files within ATM_dir
-Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
-Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
+    # output directory
+    out_dir=os.path.join(ATM_dir,'xovers')
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
 
-# output directory
-out_dir=os.path.join(ATM_dir,'xovers')
-if not os.path.isdir(out_dir):
-    os.mkdir(out_dir)
+    out_file = 'vs_{0}.h5'.format(os.path.dirname(args.atl06).replace(os.sep, '_'))
+    if os.path.isfile(os.path.join(out_dir,out_file)):
+        print("found: {0}".format(os.path.join(out_dir,out_file))) if args.verbose else None
 
-out_file = 'vs_{0}.h5'.format(os.path.dirname(ATL06_dir).replace(os.sep, '_'))
-if os.path.isfile(os.path.join(out_dir,out_file)):
-    print("found: {0}".format(os.path.join(out_dir,out_file))) if VERBOSE else None
+    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf','AA_06',args.atl06,'GeoIndex.h5')
 
-ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf','AA_06',ATL06_dir,'GeoIndex.h5')
+    SRS_proj4='+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
+    ATL06_field_dict={None:['delta_time','h_li','h_li_sigma','latitude','longitude','segment_id','sigma_geo_h','atl06_quality_summary'],
+                'ground_track':['x_atc', 'y_atc','seg_azimuth','sigma_geo_at','sigma_geo_xt'],
+                'geophysical':['dac'],
+                'bias_correction':['fpb_n_corr'],
+                'fit_statistics':['dh_fit_dx','dh_fit_dx_sigma','dh_fit_dy','h_mean', 'h_rms_misfit','h_robust_sprd','n_fit_photons','w_surface_window_final','snr_significance'],
+                'orbit_info':['rgt','orbit_number'],
+                'derived': ['BP','spot']}
 
-SRS_proj4='+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
-ATL06_field_dict={None:['delta_time','h_li','h_li_sigma','latitude','longitude','segment_id','sigma_geo_h','atl06_quality_summary'],
-            'ground_track':['x_atc', 'y_atc','seg_azimuth','sigma_geo_at','sigma_geo_xt'],
-            'geophysical':['dac'],
-            'bias_correction':['fpb_n_corr'],
-            'fit_statistics':['dh_fit_dx','dh_fit_dx_sigma','dh_fit_dy','h_mean', 'h_rms_misfit','h_robust_sprd','n_fit_photons','w_surface_window_final','snr_significance'],
-            'orbit_info':['rgt','orbit_number'],
-            'derived': ['BP','spot']}
+    ATL06_fields=list()
+    for key in ATL06_field_dict:
+        ATL06_fields+=ATL06_field_dict[key]
 
-ATL06_fields=list()
-for key in ATL06_field_dict:
-    ATL06_fields+=ATL06_field_dict[key]
+    # read all Qfit files within ATM directory
+    Qlist=list()
+    for f in sorted(Qfit_files):
+        Qlist.append(pc.ATM_Qfit.data().from_h5(f))
+    # merge the list of ATM data and build the search tree
+    Q_full=pc.data().from_list(Qlist).get_xy(SRS_proj4)
+    # run block median for qsub
+    if args.median:
+        Q_full=blockmedian_for_qsub(Q_full, 5)
+    # construct search tree from ATM Qfit coords
+    Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
+    # could pickle Qtree here to save computational time for future runs
 
-# WGS84 semimajor and semiminor axes
-WGS84a=6378137.0
-WGS84b=6356752.31424
-d2r=np.pi/180.
-delta=[10000., 10000.]
-# query radius for finding overlapping points
-qradius = 100
+    # read 10 km ATL06 index
+    D6_GI=pc.geoIndex(SRS_proj4=SRS_proj4).from_file(ATL06_index, read_file=True)
+    # Query the Qfit search tree to find intersecting ATL06 bins
+    # search within radius equal to diagonal of bin with 1km buffer (12/sqrt(2))
+    x_10km,y_10km = D6_GI.bins_as_array()
+    D6ind, = np.nonzero(Qtree.query_radius(np.c_[x_10km,y_10km],8485,count_only=True))
+    # reduce ATL06 bins to valid
+    D6_GI = D6_GI.copy_subset(xyBin=[x_10km[D6ind], y_10km[D6ind]])
 
-# read all Qfit files within ATM directory
-Qlist=list()
-for f in sorted(Qfit_files):
-    Qlist.append(pc.ATM_Qfit.data().from_h5(f))
-# merge the list of ATM data and build the search tree
-Q_full=pc.data().from_list(Qlist).get_xy(SRS_proj4)
-# run block median for qsub
-Q_full=blockmedian_for_qsub(Q_full, 5)
-# construct search tree from ATM Qfit coords
-Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
-# could pickle Qtree here to save computational time for future runs
+    out_fields=[
+        'segment_id','x','y','beam', 'BP', 'h_li', 'h_li_sigma', 'atl06_quality_summary',
+        'dac', 'rgt','orbit_number','spot',
+        'dh_fit_dx','N_50m','N_seg','h_qfit_seg','dh_qfit_dx','dh_qfit_dy',
+        'h_robust_sprd', 'snr_significance',
+        'h_qfit_50m','sigma_qfit_50m', 'sigma_seg','dz_50m','E_seg','RDE_seg',
+        'hbar_20m',
+        'RDE_50m','t_seg','t_qfit','y_atc', 'x_seg_mean', 'y_seg_mean']
+    out_template={f:np.NaN for f in out_fields}
+    out=list()
 
-# read 10 km ATL06 index
-D6_GI=pc.geoIndex(SRS_proj4=SRS_proj4).from_file(ATL06_index, read_file=True)
-# Query the Qfit search tree to find intersecting ATL06 bins
-# search within radius equal to diagonal of bin with 1km buffer (12/sqrt(2))
-x_10km,y_10km = D6_GI.bins_as_array()
-D6ind, = np.nonzero(Qtree.query_radius(np.c_[x_10km,y_10km],8485,count_only=True))
-# reduce ATL06 bins to valid
-D6_GI = D6_GI.copy_subset(xyBin=[x_10km[D6ind], y_10km[D6ind]])
+    for bin_name in sorted(D6_GI.keys()):
+        print(bin_name) if args.verbose else None
+        bin_xy=[int(coord) for coord in bin_name.split('_')]
 
-out_fields=[
-    'segment_id','x','y','beam', 'BP', 'h_li', 'h_li_sigma', 'atl06_quality_summary',
-    'dac', 'rgt','orbit_number','spot',
-    'dh_fit_dx','N_50m','N_seg','h_qfit_seg','dh_qfit_dx','dh_qfit_dy',
-    'h_robust_sprd', 'snr_significance',
-    'h_qfit_50m','sigma_qfit_50m', 'sigma_seg','dz_50m','E_seg','RDE_seg',
-    'hbar_20m',
-    'RDE_50m','t_seg','t_qfit','y_atc', 'x_seg_mean', 'y_seg_mean']
-out_template={f:np.NaN for f in out_fields}
-out=list()
+        # query ATL06 for the current bin, and index it
+        D6list=D6_GI.query_xy([[bin_xy[0]], [bin_xy[1]]], get_data=True, fields=ATL06_field_dict)
+        if not isinstance(D6list, list):
+            D6list=[D6list]
+        D6sub=pc.ATL06.data().from_list(D6list).get_xy(SRS_proj4)
 
+        # query the search tree to find points within query radius
+        D6xy = np.concatenate((D6sub.x[:,None],D6sub.y[:,None]),axis=1)
+        Qquery = Qtree.query_radius(D6xy, args.query)
+        # indices of ATL06 points within bin
+        D6ind, = np.nonzero([np.any(i) for i in Qquery])
+        # loop over queries in the ATL06 data
+        for i_AT in D6ind:
+            D6i = D6sub.copy_subset(np.array([i_AT]))
+            # grab the Qfit bins around the ATL06 bin
+            Qdata = Q_full.copy_subset(Qquery[i_AT], by_row=True)
+            Qdata.index(np.isfinite(Qdata.elevation) & np.isfinite(Qdata.latitude) & np.isfinite(Qdata.longitude))
+            # create output dictionary of ATL06 and plane-fit ATM comparison
+            this_out = compare_seg_with_qfit(D6i, Qdata, 0, out_template)
+            if this_out is not None:
+                out.append(this_out)
 
-# plt.figure(1)
-for bin_name in sorted(D6_GI.keys()):
-    #plt.clf()
-    print(bin_name) if VERBOSE else None
-    bin_xy=[int(coord) for coord in bin_name.split('_')]
+    D=dict()
+    with h5py.File(os.path.join(out_dir,out_file),'w') as h5f:
+        for field in out[0].keys():
+            D[field]=np.array([ii[field] for ii in out])
+            print(field,D[field].dtype) if args.verbose else None
+            h5f.create_dataset(field, data=D[field])
 
-    # query ATL06 for the current bin, and index it
-    D6list=D6_GI.query_xy([[bin_xy[0]], [bin_xy[1]]], get_data=True, fields=ATL06_field_dict)
-    if not isinstance(D6list, list):
-        D6list=[D6list]
-    D6sub=pc.ATL06.data().from_list(D6list).get_xy(SRS_proj4)
-
-    # query the search tree to find points within qradius
-    D6xy = np.concatenate((D6sub.x[:,None],D6sub.y[:,None]),axis=1)
-    Qquery = Qtree.query_radius(D6xy, qradius)
-    # indices of ATL06 points within bin
-    D6ind, = np.nonzero([np.any(i) for i in Qquery])
-    # loop over queries in the ATL06 data
-    for i_AT in D6ind:
-        D6i = D6sub.copy_subset(np.array([i_AT]))
-        # grab the Qfit bins around the ATL06 bin
-        Qdata = Q_full.copy_subset(Qquery[i_AT], by_row=True)
-        Qdata.index(np.isfinite(Qdata.elevation) & np.isfinite(Qdata.latitude) & np.isfinite(Qdata.longitude))
-        # create output dictionary of ATL06 and plane-fit ATM comparison
-        this_out = compare_seg_with_qfit(D6i, Qdata, 0, out_template)
-        if this_out is not None:
-            out.append(this_out)
-
-D=dict()
-with h5py.File(os.path.join(out_dir,out_file),'w') as h5f:
-    for field in out[0].keys():
-        D[field]=np.array([ii[field] for ii in out])
-        h5f.create_dataset(field, data=D[field])
+# run main program
+if __name__ == '__main__':
+    main()
