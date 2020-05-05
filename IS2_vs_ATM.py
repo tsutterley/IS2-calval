@@ -152,7 +152,7 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--atl06','-I', type=str, help="ICESat-2 ATL06 directory to run")
+    parser.add_argument('--atl06','-I', type=str, help="ICESat-2 ATL06 subdirectory to run")
     parser.add_argument('--atm', '-A', type=str,  help='ATM directory to run')
     parser.add_argument('--hemisphere','-H', type=int, default=-1, help='hemisphere, must be 1 or -1')
     parser.add_argument('--query','-Q', type=float, default=100, help='KD-Tree query radius')
@@ -163,15 +163,17 @@ def main():
 
     if args.hemisphere==1:
         SRS_proj4 = '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
+        HEM = 'GL_06'
     elif args.hemisphere==-1:
         SRS_proj4 = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
+        HEM = 'AA_06'
 
     # tilde expansion of file arguments
     ATM_dir=os.path.expanduser(args.atm)
     print("working on ATL06 dir {0}, ATM directory {1}".format(args.atl06, ATM_dir)) if args.verbose else None
 
     # find Qfit files within ATM_dir
-    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
+    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5$")
     Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
 
     # output directory
@@ -183,7 +185,7 @@ def main():
     if os.path.isfile(os.path.join(out_dir,out_file)):
         print("found: {0}".format(os.path.join(out_dir,out_file))) if args.verbose else None
 
-    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf','AA_06',args.atl06,'GeoIndex.h5')
+    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf',HEM,args.atl06,'GeoIndex.h5')
     ATL06_field_dict={None:['delta_time','h_li','h_li_sigma','latitude','longitude','segment_id','sigma_geo_h','atl06_quality_summary'],
                 'ground_track':['x_atc', 'y_atc','seg_azimuth','sigma_geo_at','sigma_geo_xt'],
                 'geophysical':['dac'],

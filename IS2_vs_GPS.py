@@ -151,9 +151,11 @@ def main():
 
     if args.hemisphere==1:
         SRS_proj4 = '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
+        HEM = 'GL_06'
     elif args.hemisphere==-1:
         SRS_proj4 = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
-
+        HEM = 'AA_06'
+    
     # tilde expansion of file arguments
     GPS_file=os.path.expanduser(args.gps)
     GPS_dir=os.path.dirname(GPS_file)
@@ -169,7 +171,7 @@ def main():
     if os.path.isfile(os.path.join(out_dir,out_file)):
         print("found: {0}".format(os.path.join(out_dir,out_file))) if args.verbose else None
 
-    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf','AA_06',args.atl06,'GeoIndex.h5')
+    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf',HEM,args.atl06,'GeoIndex.h5')
 
     SRS_proj4='+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
     ATL06_field_dict={None:['delta_time','h_li','h_li_sigma','latitude','longitude','segment_id','sigma_geo_h','atl06_quality_summary'],

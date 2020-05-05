@@ -181,7 +181,7 @@ def main():
     print("working on GPS file {0}, ATM directory {1}".format(GPS_file, ATM_dir)) if args.verbose else None
 
     # find Qfit files within ATM_dir
-    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
+    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5$")
     Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
 
     # output directory
