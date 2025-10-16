@@ -37,10 +37,10 @@ def my_lsfit(G, d):
         #m=m0[0]
     except ValueError:
         print("ValueError in LSq")
-        return np.NaN+np.zeros(G.shape[1]), np.NaN, np.NaN
+        return np.nan+np.zeros(G.shape[1]), np.nan, np.nan
     except np.linalg.LinAlgError:
         print("LinalgError in LSq")
-        return np.NaN+np.zeros(G.shape[1]), np.NaN, np.NaN
+        return np.nan+np.zeros(G.shape[1]), np.nan, np.nan
     r=d-G.dot(m)
     R=np.sqrt(np.sum(r**2)/(d.size-G.shape[1]))
     sigma_hat=RDE(r)
@@ -233,7 +233,7 @@ def main():
     # append scan fields to output template
     if args.scan:
         out_fields.extend(['scan_XT_50m','scan_XT_10m'])
-    out_template={f:np.NaN for f in out_fields}
+    out_template={f:np.nan for f in out_fields}
     out=list()
 
     # query the search tree to find points within query radius

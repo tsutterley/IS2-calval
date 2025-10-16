@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Compare ATM data with ICESat-2 data.
+Compare data at the 88S pole hole.
 
 This script uses the geo_index framework to load spatially overlapping blocks of
 ATM and ATL06 data, and calculate differences between ATL06 segments and the
@@ -14,8 +14,8 @@ Created on Wed Sep  5 13:36:08 2018
 import pointCollection as pc
 #from PointDatabase import ATL06_filters
 from ATL11.RDE import RDE
+import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 import h5py
 import os
 import re
@@ -23,7 +23,6 @@ import sys
 import argparse
 #from ATL11.pt_blockmedian import pt_blockmedian
 from PointDatabase import pt_blockmedian
-from ATM_waveform.fit_ATM_scan import fit_ATM_data
 from sklearn.neighbors import KDTree
 
 # WGS84 semimajor and semiminor axes
@@ -39,10 +38,7 @@ def my_lsfit(G, d):
         #m=m0[0]
     except ValueError:
         print("ValueError in LSq")
-        return np.NaN+np.zeros(G.shape[1]), np.NaN, np.NaN
-    except np.linalg.LinAlgError:
-        print("LinalgError in LSq")
-        return np.NaN+np.zeros(G.shape[1]), np.NaN, np.NaN
+
     r=d-G.dot(m)
     R=np.sqrt(np.sum(r**2)/(d.size-G.shape[1]))
     sigma_hat=RDE(r)
@@ -67,11 +63,11 @@ def blockmedian_for_qsub(Qdata, delta):
     Qdata.longitude=0.5*(delta_lon[ind[:,0]]+delta_lon[ind[:,1]])+lon0
     return Qdata
 
-def compare_seg_with_qfit(D6i, Qdata, out_template):
+def compare_seg_with_qfit(D6i, Qdata, beam, out_template):
 
     # calculate the ellipsoid radius for the current point
-    lat0=D6i.latitude
-    lon0=D6i.longitude
+    lat0=D6i.latitude[beam]
+    lon0=D6i.longitude[beam]
     Re=WGS84a**2/np.sqrt((WGS84a*np.cos(d2r*lat0))**2+(WGS84b*np.sin(d2r*lat0))**2)
 
     # project the Qfit latitude and longitude into northing and easting
@@ -82,14 +78,10 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
     if np.sum(ind_50m) < 10:
         return None
     EN=EN[ind_50m,:]
-	# elevation of Qfit data
     z=Qdata.elevation[ind_50m].astype(np.float64)
-    # cross track position
-    if 'scan_XT' in Qdata.fields:
-        scan_XT=Qdata.scan_XT[ind_50m]
 
     # calculate along-track vector and the across-track vector
-    this_az=D6i.seg_azimuth[0]
+    this_az=D6i.seg_azimuth[beam]
     if not np.isfinite(this_az):
         return None
     at_vec=np.array([np.sin(this_az*d2r), np.cos(this_az*d2r)])
@@ -105,7 +97,7 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
                  'delta_time', 'h_robust_sprd', 'snr_significance','y_atc','rgt','dac','spot']
 
     for field in copy_fields:
-        this_out[field]=getattr(D6i, field)
+        this_out[field]=getattr(D6i, field)[beam]
 
     #fit a plane to all data within 50m of the point
     G=np.c_[np.ones((ind_50m.sum(), 1)), xy_at]
@@ -120,10 +112,8 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
     this_out['dh_qfit_dx']=m[1]
     this_out['dh_qfit_dy']=m[2]
     this_out['N_50m']=np.sum(ind_50m)
-    this_out['dz_50m']=D6i.h_li-m[0]
+    this_out['dz_50m']=D6i.h_li[beam]-m[0]
     this_out['RDE_50m']=sigma_hat
-    if 'scan_XT' in Qdata.fields:
-        this_out['scan_XT_50m']=np.nanmean(scan_XT)
 
     ind_20m=np.sum(EN**2,axis=1)<20**2
     if np.sum(ind_20m)> 5:
@@ -137,43 +127,37 @@ def compare_seg_with_qfit(D6i, Qdata, out_template):
     this_out['sigma_qfit_seg']=R
     this_out['h_qfit_seg']=m[0]
     this_out['N_seg']=np.sum(sub_seg)
-    this_out['dz_seg']=D6i.h_li-m[0]
+    this_out['dz_seg']=D6i.h_li[beam]-m[0]
     this_out['RDE_seg']=sigma_hat
-    this_out['beam_pair']=D6i.BP
+    this_out['beam']=beam
+    this_out['beam_pair']=D6i.BP[beam]
     this_out['t_qfit']=np.nanmean(Qdata.days_J2k[ind_50m])
     this_out['y_seg_mean']=np.nanmean(xy_at[sub_seg,1])
     this_out['x_seg_mean']=np.nanmean(xy_at[sub_seg,0])
-    if 'scan_XT' in Qdata.fields:
-        this_out['scan_XT_seg']=np.nanmean(scan_XT[sub_seg])
-
     # return the output dictionary
     return this_out
 
-
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--atl06','-I', type=str, help="ICESat-2 ATL06 subdirectory to run")
+    parser.add_argument('--atl06','-I', type=str, help="ICESat-2 ATL06 directory to run")
     parser.add_argument('--atm', '-A', type=str,  help='ATM directory to run')
     parser.add_argument('--hemisphere','-H', type=int, default=-1, help='hemisphere, must be 1 or -1')
     parser.add_argument('--query','-Q', type=float, default=100, help='KD-Tree query radius')
     parser.add_argument('--median','-M', default=False, action='store_true', help='Run block median')
-    parser.add_argument('--scan','-S', default=False, action='store_true', help='Run ATM scan fit')
     parser.add_argument('--verbose','-v', default=False, action='store_true', help='verbose output of run')
     args=parser.parse_args()
 
     if args.hemisphere==1:
         SRS_proj4 = '+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs '
-        HEM = 'GL_06'
     elif args.hemisphere==-1:
         SRS_proj4 = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
-        HEM = 'AA_06'
 
     # tilde expansion of file arguments
     ATM_dir=os.path.expanduser(args.atm)
     print("working on ATL06 dir {0}, ATM directory {1}".format(args.atl06, ATM_dir)) if args.verbose else None
 
     # find Qfit files within ATM_dir
-    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5$")
+    Qfit_regex = re.compile(r"ATM1B.*_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2}).*.h5")
     Qfit_files = [os.path.join(ATM_dir,f) for f in os.listdir(ATM_dir) if Qfit_regex.search(f)]
 
     # output directory
@@ -185,7 +169,9 @@ def main():
     if os.path.isfile(os.path.join(out_dir,out_file)):
         print("found: {0}".format(os.path.join(out_dir,out_file))) if args.verbose else None
 
-    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf',HEM,args.atl06,'GeoIndex.h5')
+    ATL06_index=os.path.join(os.sep,'Volumes','ice2','ben','scf','AA_06',args.atl06,'GeoIndex.h5')
+
+    SRS_proj4='+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
     ATL06_field_dict={None:['delta_time','h_li','h_li_sigma','latitude','longitude','segment_id','sigma_geo_h','atl06_quality_summary'],
                 'ground_track':['x_atc', 'y_atc','seg_azimuth','sigma_geo_at','sigma_geo_xt'],
                 'geophysical':['dac'],
@@ -198,26 +184,18 @@ def main():
     for key in ATL06_field_dict:
         ATL06_fields+=ATL06_field_dict[key]
 
-
     # read all Qfit files within ATM directory
     Qlist=list()
     for f in sorted(Qfit_files):
         Qlist.append(pc.ATM_Qfit.data().from_h5(f))
     # merge the list of ATM data and build the search tree
     Q_full=pc.data().from_list(Qlist).get_xy(SRS_proj4)
-    # fit scan parameters to an ATM data structure
-    if args.scan:
-        Q_full=fit_ATM_data(Q_full)
     # run block median for qsub
     if args.median:
         Q_full=blockmedian_for_qsub(Q_full, 5)
     # construct search tree from ATM Qfit coords
-    # pickle Qtree to save computational time for future runs
-    if os.path.isfile(os.path.join(ATM_dir,'tree.p')):
-        Qtree = pickle.load(open(os.path.join(ATM_dir,'tree.p'),'rb'))
-    else:
-        Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
-        pickle.dump(Qtree,open(os.path.join(ATM_dir,'tree.p'),'wb'))
+    Qtree = KDTree(np.c_[Q_full.x,Q_full.y])
+    # could pickle Qtree here to save computational time for future runs
 
     # read 10 km ATL06 index
     D6_GI=pc.geoIndex(SRS_proj4=SRS_proj4).from_file(ATL06_index, read_file=True)
@@ -229,16 +207,14 @@ def main():
     D6_GI = D6_GI.copy_subset(xyBin=[x_10km[D6ind], y_10km[D6ind]])
 
     out_fields=[
-        'segment_id','x','y', 'BP', 'h_li', 'h_li_sigma', 'atl06_quality_summary',
+        'segment_id','x','y','beam', 'BP', 'h_li', 'h_li_sigma', 'atl06_quality_summary',
         'dac', 'rgt','orbit_number','spot',
         'dh_fit_dx','N_50m','N_seg','h_qfit_seg','dh_qfit_dx','dh_qfit_dy',
         'h_robust_sprd', 'snr_significance',
         'h_qfit_50m','sigma_qfit_50m', 'sigma_seg','dz_50m','E_seg','RDE_seg',
-        'hbar_20m','RDE_50m','t_seg','t_qfit','y_atc', 'x_seg_mean', 'y_seg_mean']
-    # append scan fields to output template
-    if args.scan:
-        out_fields.extend(['scan_XT_50m','scan_XT_seg'])
-    out_template={f:np.NaN for f in out_fields}
+        'hbar_20m',
+        'RDE_50m','t_seg','t_qfit','y_atc', 'x_seg_mean', 'y_seg_mean']
+    out_template={f:np.nan for f in out_fields}
     out=list()
 
     for bin_name in sorted(D6_GI.keys()):
@@ -250,11 +226,9 @@ def main():
         if not isinstance(D6list, list):
             D6list=[D6list]
         D6sub=pc.ATL06.data().from_list(D6list).get_xy(SRS_proj4)
-        D6sub.ravel_fields()
+
         # query the search tree to find points within query radius
-        #D6xy = np.c_[(np.nanmean(D6sub.x, axis=1),np.nanmean(D6sub.y, axis=1))]
-        D6sub.index(np.isfinite(D6sub.x) & np.isfinite(D6sub.h_li))
-        D6xy = np.c_[D6sub.x, D6sub.y]
+        D6xy = np.concatenate((D6sub.x[:,None],D6sub.y[:,None]),axis=1)
         Qquery = Qtree.query_radius(D6xy, args.query)
         # indices of ATL06 points within bin
         D6ind, = np.nonzero([np.any(i) for i in Qquery])
@@ -265,7 +239,7 @@ def main():
             Qdata = Q_full.copy_subset(Qquery[i_AT], by_row=True)
             Qdata.index(np.isfinite(Qdata.elevation) & np.isfinite(Qdata.latitude) & np.isfinite(Qdata.longitude))
             # create output dictionary of ATL06 and plane-fit ATM comparison
-            this_out = compare_seg_with_qfit(D6i, Qdata, out_template)
+            this_out = compare_seg_with_qfit(D6i, Qdata, 0, out_template)
             if this_out is not None:
                 out.append(this_out)
 

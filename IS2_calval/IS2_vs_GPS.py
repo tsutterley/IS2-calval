@@ -37,10 +37,10 @@ def my_lsfit(G, d):
         #m=m0[0]
     except ValueError:
         print("ValueError in LSq")
-        return np.NaN+np.zeros(G.shape[1]), np.NaN, np.NaN
+        return np.nan+np.zeros(G.shape[1]), np.nan, np.nan
     except np.linalg.LinAlgError:
         print("LinalgError in LSq")
-        return np.NaN+np.zeros(G.shape[1]), np.NaN, np.NaN
+        return np.nan+np.zeros(G.shape[1]), np.nan, np.nan
     r=d-G.dot(m)
     R=np.sqrt(np.sum(r**2)/(d.size-G.shape[1]))
     sigma_hat=RDE(r)
@@ -155,7 +155,7 @@ def main():
     elif args.hemisphere==-1:
         SRS_proj4 = '+proj=stere +lat_0=-90 +lat_ts=-71 +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs'
         HEM = 'AA_06'
-    
+
     # tilde expansion of file arguments
     GPS_file=os.path.expanduser(args.gps)
     GPS_dir=os.path.dirname(GPS_file)
@@ -216,7 +216,7 @@ def main():
         'h_robust_sprd', 'snr_significance',
         'h_gps_50m','sigma_gps_50m', 'sigma_seg','dz_50m','E_seg','RDE_seg',
         'hbar_20m','RDE_50m','t_seg','y_atc', 'x_seg_mean', 'y_seg_mean']
-    out_template={f:np.NaN for f in out_fields}
+    out_template={f:np.nan for f in out_fields}
     out=list()
 
     for bin_name in sorted(D6_GI.keys()):
