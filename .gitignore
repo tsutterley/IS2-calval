@@ -24,6 +24,11 @@ Thumbs.db
 *.sw*
 *.hidden
 
+# Data files
+*.h5
+*.nc
+*.xlsx
+
 # Distribution / packaging
 .Python
 build/
@@ -129,3 +134,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml
