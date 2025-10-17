@@ -192,6 +192,8 @@ if __name__ == '__main__':
     df = from_excel()
     # ensure granules are downloaded
     get_granules(df)
+    # buffer time (seconds)
+    buffer_time = 300
     # for each ocean scan event
     for i, row in df.iterrows():
         # find granules for event
@@ -199,3 +201,9 @@ if __name__ == '__main__':
         # read data from each granule and concatenate into dataframe
         dataframes = [read_granule(g) for g in granules]
         df1 = pd.concat(dataframes, ignore_index=True)
+        # filter to ocean scan time period
+        delta_time_start = row['delta_time_start'] - buffer_time
+        delta_time_end = row['delta_time_end'] + buffer_time
+        mask = (df1['delta_time'] >= delta_time_start) & \
+               (df1['delta_time'] <= delta_time_end)
+        df2 = df1.loc[mask,:].reset_index(drop=True)
