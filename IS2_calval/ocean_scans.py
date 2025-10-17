@@ -200,6 +200,9 @@ if __name__ == '__main__':
         granules = find_granules(row)
         # read data from each granule and concatenate into dataframe
         dataframes = [read_granule(g) for g in granules]
+        # skip ocean scan event if no data
+        if not dataframes:
+            continue
         df1 = pd.concat(dataframes, ignore_index=True)
         # filter to ocean scan time period
         delta_time_start = row['delta_time_start'] - buffer_time

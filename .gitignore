@@ -28,6 +28,7 @@ Thumbs.db
 *.h5
 *.nc
 *.xlsx
+*.parquet
 
 # Distribution / packaging
 .Python
