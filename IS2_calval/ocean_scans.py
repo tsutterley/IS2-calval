@@ -23,10 +23,12 @@ mapping['ATL12'] = dict(
     delta_time = 'ssh_segments/delta_time',
     longitude = 'ssh_segments/longitude',
     latitude = 'ssh_segments/latitude',
+    fpb_corr = 'ssh_segments/heights/fpb_corr',
     h = 'ssh_segments/heights/h',
     h_ice_free = 'ssh_segments/heights/h_ice_free',
     h_ice_free_uncrtn = 'ssh_segments/heights/h_ice_free_uncrtn',
-    fpb_corr = 'ssh_segments/heights/fpb_corr',
+    geoid_free2mean_seg = 'ssh_segments/stats/geoid_free2mean_seg',
+    geoid_seg = 'ssh_segments/stats/geoid_seg',
     ice_conc = 'ssh_segments/stats/ice_conc',
     n_photon = 'ssh_segments/stats/n_photons',
     n_ttl_photon = 'ssh_segments/stats/n_ttl_photon',
@@ -209,4 +211,7 @@ if __name__ == '__main__':
         delta_time_end = row['delta_time_end'] + buffer_time
         mask = (df1['delta_time'] >= delta_time_start) & \
                (df1['delta_time'] <= delta_time_end)
+        # skip if no data in (buffered) time range
+        if not np.any(mask):
+            continue
         df2 = df1.loc[mask,:].reset_index(drop=True)
