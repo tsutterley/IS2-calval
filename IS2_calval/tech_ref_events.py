@@ -6,6 +6,9 @@ Check ICESat-2 data before and after events in the Tech Ref Table
 
 Tech Ref Table:
 https://doi.org/10.5281/zenodo.16283560
+
+UPDATE HISTORY:
+    Written 10/2025
 """
 import re
 import h5py
