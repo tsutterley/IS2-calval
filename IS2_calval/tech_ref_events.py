@@ -31,12 +31,16 @@ mapping['ATL12'] = dict(
     h = 'ssh_segments/heights/h',
     h_ice_free = 'ssh_segments/heights/h_ice_free',
     h_ice_free_uncrtn = 'ssh_segments/heights/h_ice_free_uncrtn',
+    h_var = 'ssh_segments/heights/h_var',
     geoid_free2mean_seg = 'ssh_segments/stats/geoid_free2mean_seg',
     geoid_seg = 'ssh_segments/stats/geoid_seg',
     ice_conc = 'ssh_segments/stats/ice_conc',
+    length_seg = 'ssh_segments/heights/length_seg',
     n_photon = 'ssh_segments/stats/n_photons',
+    n_pulse_seg = 'ssh_segments/heights/n_pulse_seg',
     n_ttl_photon = 'ssh_segments/stats/n_ttl_photon',
-    near_sat_fract_seg = 'ssh_segments/stats/near_sat_fract_seg'
+    near_sat_fract_seg = 'ssh_segments/stats/near_sat_fract_seg',
+    swh = 'ssh_segments/heights/swh'
 )
 
 def from_excel(xls_file=None, pattern=r'OceanScan'):
