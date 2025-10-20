@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 """
-ocean_scans.py
+tech_ref_events.py
 Written by Tyler Sutterley (10/2025)
-Check ATL12 data before and after ocean scans
+Check ICESat-2 data before and after events in the Tech Ref Table
 
 Tech Ref Table:
 https://doi.org/10.5281/zenodo.16283560
 """
 import re
 import h5py
+import argparse
 import numpy as np
 import pandas as pd
 import icesat2_toolkit as is2tk
@@ -127,7 +128,7 @@ def cmr(df, product='ATL12', release=7):
     # return the dataframe of granule ids and urls
     return df2
 
-def get_granules(df, product='ATL12', release=7):
+def get_granules(df, product='ATL12', release=7, timeout=60):
     # get granule ids and urls from CMR
     df2 = cmr(df, product=product, release=release)
     # create subdirectory for product and release
@@ -138,7 +139,7 @@ def get_granules(df, product='ATL12', release=7):
         granule = subdir.joinpath(row['granule_id'])
         if not granule.exists():
             is2tk.utilities.from_nsidc(row['url'], local=granule,
-                timeout=60, verbose=True)
+                timeout=timeout, verbose=True)
 
 def find_granules(df, product='ATL12', release=7):
     # get all cycles and RGTs from dataframe
@@ -155,14 +156,14 @@ def find_granules(df, product='ATL12', release=7):
     granules = [g for g in subdir.iterdir() if rx.match(g.name)]
     return granules
 
-def read_granule(granule, product='ATL12'):
+def read_granule(granule):
     # regular expression pattern for extracting information
-    pattern = r'(ATL\d{2})_(\d{14})_(\d{4})(\d{2})'
+    pattern = r'(ATL\d{2})(-\d+)?_(\d{14})_(\d{4})(\d{2})'
     rx = re.compile(pattern, re.VERBOSE)
-    PRD, YYYYMMDDHHMMSS, RGT, CYC = rx.findall(granule.name).pop()
+    PRD, HEM, YYYYMMDDHHMMSS, RGT, CYC = rx.findall(granule.name).pop()
     # read data from granule and concatenate into dataframe
     dataframes = []
-    func = getattr(is2tk.io, product)
+    func = getattr(is2tk.io, PRD)
     # read data from each beam
     with h5py.File(granule, 'r') as fileID:
         beams = func.find_beams(fileID, KEEP=True)
@@ -170,7 +171,7 @@ def read_granule(granule, product='ATL12'):
             # initialize dictionary for storing variables
             data = {}
             # extract variables from HDF5 file
-            for key,val in mapping[product].items():
+            for key,val in mapping[PRD].items():
                 data[key] = fileID[gtx][val][:]
                 # apply fill values
                 if hasattr(fileID[gtx][val], 'fillvalue'):
@@ -189,29 +190,77 @@ def read_granule(granule, product='ATL12'):
     # return the dataframe
     return df
 
-if __name__ == '__main__':
-    # read excel file with the tech ref table  
-    df = from_excel()
-    # ensure granules are downloaded
-    get_granules(df)
+# PURPOSE: create argument parser
+def arguments():
+    parser = argparse.ArgumentParser(
+        description="""Creates a parquet file of ICESat-2 data
+            around events in the Tech Ref Table
+            """
+    )
+    # command line parameters
+    parser.add_argument('product',
+        type=str,
+        help='ICESat-2 products to run')
+    # ICESat-2 data release
+    parser.add_argument('--release','-r',
+        type=int, default=7,
+        help='ICESat-2 Data Release')
+    # event type
+    parser.add_argument('--event','-e',
+        type=str, default='OceanScan',
+        help='Event type in Tech Ref Table')
     # buffer time (seconds)
-    buffer_time = 300
-    # for each ocean scan event
+    parser.add_argument('--buffer','-b',
+        type=int, default=300,
+        help='Buffer time (seconds) around event')
+    # connection timeout and number of retry attempts
+    parser.add_argument('--timeout','-T',
+        type=int, default=120,
+        help='Timeout in seconds for blocking operations')
+    # return the parser
+    return parser
+
+# This is the main part of the program that calls the individual functions
+def main():
+    # Read the system arguments listed after the program
+    parser = arguments()
+    args,_ = parser.parse_known_args()
+
+    # read excel file with the tech ref table  
+    df = from_excel(pattern=args.event)
+    # ensure granules are available
+    get_granules(df,
+        product=args.product,
+        release=args.release,
+        timeout=args.timeout
+    )
+    # for each event
     for i, row in df.iterrows():
         # find granules for event
-        granules = find_granules(row)
+        granules = find_granules(row,
+            product=args.product,
+            release=args.release
+        )
         # read data from each granule and concatenate into dataframe
         dataframes = [read_granule(g) for g in granules]
-        # skip ocean scan event if no data
+        # skip event if no data
         if not dataframes:
             continue
         df1 = pd.concat(dataframes, ignore_index=True)
-        # filter to ocean scan time period
-        delta_time_start = row['delta_time_start'] - buffer_time
-        delta_time_end = row['delta_time_end'] + buffer_time
+        # filter to time period around event
+        delta_time_start = row['delta_time_start'] - args.buffer
+        delta_time_end = row['delta_time_end'] + args.buffer
         mask = (df1['delta_time'] >= delta_time_start) & \
                (df1['delta_time'] <= delta_time_end)
         # skip if no data in (buffered) time range
         if not np.any(mask):
             continue
+        # filter dataframe to bounds around event
         df2 = df1.loc[mask,:].reset_index(drop=True)
+        # write dataframe to output parquet file
+        outfile = (f'{args.product}_{args.event}_Cycle{row.cycle:02.0f}_'
+            f'RGT{row.rgt_start:04.0f}-{row.rgt_end:04.0f}.parquet')
+        df2.to_parquet(filepath.joinpath(outfile), index=False)
+
+if __name__ == '__main__':
+    main()
