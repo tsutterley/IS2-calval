@@ -31,12 +31,16 @@ mapping['ATL12'] = dict(
     h = 'ssh_segments/heights/h',
     h_ice_free = 'ssh_segments/heights/h_ice_free',
     h_ice_free_uncrtn = 'ssh_segments/heights/h_ice_free_uncrtn',
+    h_var = 'ssh_segments/heights/h_var',
     geoid_free2mean_seg = 'ssh_segments/stats/geoid_free2mean_seg',
     geoid_seg = 'ssh_segments/stats/geoid_seg',
     ice_conc = 'ssh_segments/stats/ice_conc',
+    length_seg = 'ssh_segments/heights/length_seg',
     n_photon = 'ssh_segments/stats/n_photons',
+    n_pulse_seg = 'ssh_segments/heights/n_pulse_seg',
     n_ttl_photon = 'ssh_segments/stats/n_ttl_photon',
-    near_sat_fract_seg = 'ssh_segments/stats/near_sat_fract_seg'
+    near_sat_fract_seg = 'ssh_segments/stats/near_sat_fract_seg',
+    swh = 'ssh_segments/heights/swh'
 )
 
 def from_excel(xls_file=None, pattern=r'OceanScan'):
@@ -201,8 +205,8 @@ def arguments():
             """
     )
     # command line parameters
-    parser.add_argument('product',
-        type=str,
+    parser.add_argument('--product','-p',
+        type=str, default='ATL12',
         help='ICESat-2 products to run')
     # ICESat-2 data release
     parser.add_argument('--release','-r',
@@ -214,8 +218,12 @@ def arguments():
         help='Event type in Tech Ref Table')
     # buffer time (seconds)
     parser.add_argument('--buffer','-b',
-        type=int, default=300,
+        type=int, default=300, nargs='?',
         help='Buffer time (seconds) around event')
+    # download files
+    parser.add_argument('--download','-d',
+        default=False, action='store_true',
+        help='Download granules from NSIDC')
     # connection timeout and number of retry attempts
     parser.add_argument('--timeout','-T',
         type=int, default=120,
@@ -232,11 +240,15 @@ def main():
     # read excel file with the tech ref table  
     df = from_excel(pattern=args.event)
     # ensure granules are available
-    get_granules(df,
-        product=args.product,
-        release=args.release,
-        timeout=args.timeout
-    )
+    if args.download:
+        get_granules(df,
+            product=args.product,
+            release=args.release,
+            timeout=args.timeout
+        )
+    # buffer time around event (seconds)
+    # can be a single value (equal) or two values (for start and end)
+    buffer_time = np.broadcast_to(np.atleast_1d(args.buffer),(2,))
     # for each event
     for i, row in df.iterrows():
         # find granules for event
@@ -251,8 +263,8 @@ def main():
             continue
         df1 = pd.concat(dataframes, ignore_index=True)
         # filter to time period around event
-        delta_time_start = row['delta_time_start'] - args.buffer
-        delta_time_end = row['delta_time_end'] + args.buffer
+        delta_time_start = row['delta_time_start'] - buffer_time[0]
+        delta_time_end = row['delta_time_end'] + buffer_time[1]
         mask = (df1['delta_time'] >= delta_time_start) & \
                (df1['delta_time'] <= delta_time_end)
         # skip if no data in (buffered) time range
