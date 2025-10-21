@@ -11,19 +11,16 @@ Created on Wed Sep  5 13:36:08 2018
 @author: ben
 """
 
-import pointCollection as pc
-#from PointDatabase import ATL06_filters
-from ATL11.RDE import RDE
-import numpy as np
-import pickle
-import h5py
 import os
 import re
 import sys
+import h5py
+import pickle
 import argparse
-#from ATL11.pt_blockmedian import pt_blockmedian
-from pointCollection import pt_blockmedian
-from ATM_waveform.fit_ATM_scan import fit_ATM_data
+import numpy as np
+import IS2_calval.fit
+import pointCollection as pc
+from pointCollection import pt_blockmedian, RDE
 from sklearn.neighbors import KDTree
 
 # WGS84 semimajor and semiminor axes
@@ -154,7 +151,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--directory','-D', type=lambda p: os.path.abspath(os.path.expanduser(p)), help="ICESat-2 ATL06 directory")
     parser.add_argument('--atl06','-I', type=str, help="ICESat-2 ATL06 subdirectory to run")
-    parser.add_argument('--release','R', type=str, help="ICESat-2 ATL06 data release subdirectory to run")
+    parser.add_argument('--release','-R', type=str, help="ICESat-2 ATL06 data release subdirectory to run")
     parser.add_argument('--atm', '-A', type=lambda p: os.path.abspath(os.path.expanduser(p)), help='ATM directory to run')
     parser.add_argument('--hemisphere','-H', type=int, default=-1, help='hemisphere, must be 1 or -1')
     parser.add_argument('--query','-Q', type=float, default=100, help='KD-Tree query radius')
@@ -211,7 +208,7 @@ def main():
     Q_full=pc.data().from_list(Qlist).get_xy(SRS_proj4)
     # fit scan parameters to an ATM data structure
     if args.scan:
-        Q_full=fit_ATM_data(Q_full)
+        Q_full=IS2_calval.fit.fit_ATM_data(Q_full)
     # run block median for qsub
     if args.median:
         Q_full=blockmedian_for_qsub(Q_full, 5)

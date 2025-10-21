@@ -34,7 +34,6 @@ dependencies = [
     "python-dateutil",
     "scikit-learn",
     "scipy>=1.10.1",
-    "timescale>=0.0.8",
 ]
 
 classifiers=[
@@ -58,8 +57,21 @@ Repository = "https://github.com/tsutterley/IS2-calval"
 Issues = "https://github.com/tsutterley/IS2-calval/issues"
 
 [project.optional-dependencies]
+all = [
+    "gdal",
+    "geopandas",
+    "LSsurf @ git+https://github.com/SmithB/LSsurf.git",
+    "pointcollection @ git+https://github.com/SmithB/pointCollection.git",
+    "sortedcontainers",
+    "sparseqr @ git+https://github.com/yig/PySPQR.git",
+    "timescale>=0.0.8",
+]
 
 [project.scripts]
+"GPS_vs_ATM.py" = "IS2_calval.GPS_vs_ATM:main" 
+"IS2_vs_ATM.py" = "IS2_calval.IS2_vs_ATM:main" 
+"IS2_vs_GPS.py" = "IS2_calval.IS2_vs_GPS:main" 
+"polehole_diff.py" = "IS2_calval.polehole_diff:main" 
 "tech_ref_events.py" = "IS2_calval.tech_ref_events:main" 
 
 [tool.setuptools.packages.find]
@@ -84,8 +96,22 @@ pyproj = "*"
 python-dateutil = "*"
 scikit-learn = "*"
 scipy = "*"
+
+[tool.pixi.feature.all.dependencies]
+cython = "*"
+gdal = "*"
+geopandas = "*"
+sortedcontainers = "*"
+suitesparse = "*"
 timescale = "*"
 
 [tool.pixi.pypi-dependencies]
 IS2-calval = { path = ".", editable = true }
 icesat2-toolkit = "*"
+
+[tool.pixi.feature.all.pypi-dependencies]
+IS2-calval = { path = ".", editable = true, extras = ["all"] }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+all = { features = ["all"], solve-group = "default" }
