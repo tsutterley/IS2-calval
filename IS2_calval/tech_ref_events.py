@@ -11,48 +11,25 @@ UPDATE HISTORY:
     Written 10/2025
 """
 import re
-import h5py
 import argparse
 import numpy as np
 import pandas as pd
 import icesat2_toolkit as is2tk
-import utilities
+import IS2_calval as is2cv
 
 # get path to data directory
-filepath = utilities.get_data_path(['data'])
-
-# variable mapping
-mapping = {}
-mapping['ATL12'] = dict(
-    delta_time = 'ssh_segments/delta_time',
-    longitude = 'ssh_segments/longitude',
-    latitude = 'ssh_segments/latitude',
-    fpb_corr = 'ssh_segments/heights/fpb_corr',
-    h = 'ssh_segments/heights/h',
-    h_ice_free = 'ssh_segments/heights/h_ice_free',
-    h_ice_free_uncrtn = 'ssh_segments/heights/h_ice_free_uncrtn',
-    h_var = 'ssh_segments/heights/h_var',
-    geoid_free2mean_seg = 'ssh_segments/stats/geoid_free2mean_seg',
-    geoid_seg = 'ssh_segments/stats/geoid_seg',
-    ice_conc = 'ssh_segments/stats/ice_conc',
-    length_seg = 'ssh_segments/heights/length_seg',
-    n_photon = 'ssh_segments/stats/n_photons',
-    n_pulse_seg = 'ssh_segments/heights/n_pulse_seg',
-    n_ttl_photon = 'ssh_segments/stats/n_ttl_photon',
-    near_sat_fract_seg = 'ssh_segments/stats/near_sat_fract_seg',
-    swh = 'ssh_segments/heights/swh'
-)
+filepath = is2cv.utilities.get_data_path(['data'])
 
 def from_excel(xls_file=None, pattern=r'OceanScan'):
     # get excel file if not provided
     if xls_file is None:
         # get zenodo url and checksum for the tech ref table
-        zenodo_url, checksum = utilities.get_zenodo_url()
+        zenodo_url, checksum = is2cv.utilities.get_zenodo_url()
         # download excel file from zenodo
         # and validate against checksum
-        xls_file = utilities.from_http(zenodo_url, hash=checksum)
+        xls_file = is2cv.utilities.from_http(zenodo_url, hash=checksum)
     # get sheet names from excel file
-    sheets = utilities.get_excel_sheet_names(xls_file,
+    sheets = is2cv.utilities.get_excel_sheet_names(xls_file,
         pattern=r'Cycle\s+(\d+)')
     # compile regex for filtering rows
     rx = re.compile(pattern, re.IGNORECASE)
@@ -163,40 +140,6 @@ def find_granules(df, product='ATL12', release=7):
     granules = [g for g in subdir.iterdir() if rx.match(g.name)]
     return granules
 
-def read_granule(granule):
-    # regular expression pattern for extracting information
-    pattern = r'(ATL\d{2})(-\d+)?_(\d{14})_(\d{4})(\d{2})'
-    rx = re.compile(pattern, re.VERBOSE)
-    PRD, HEM, YYYYMMDDHHMMSS, RGT, CYC = rx.findall(granule.name).pop()
-    # read data from granule and concatenate into dataframe
-    dataframes = []
-    func = getattr(is2tk.io, PRD)
-    # read data from each beam
-    with h5py.File(granule, 'r') as fileID:
-        beams = func.find_beams(fileID, KEEP=True)
-        for gtx in beams:
-            # initialize dictionary for storing variables
-            data = {}
-            # extract variables from HDF5 file
-            for key,val in mapping[PRD].items():
-                data[key] = fileID[gtx][val][:]
-                # apply fill values
-                if hasattr(fileID[gtx][val], 'fillvalue'):
-                    fv = fileID[gtx][val].fillvalue
-                    data[key] = np.ma.masked_equal(data[key], fv)
-            # get derived variables
-            atlas_spot_number = fileID[gtx].attrs['atlas_spot_number']
-            data['atlas_spot_number'] = int(atlas_spot_number)
-            data['ground_track'] = gtx
-            data['track'] = int(RGT)
-            data['cycle'] = int(CYC)
-            # create dataframe and append to list
-            dataframes.append(pd.DataFrame(data))
-    # concatenate dataframes for each beam
-    df = pd.concat(dataframes, ignore_index=True)
-    # return the dataframe
-    return df
-
 # PURPOSE: create argument parser
 def arguments():
     parser = argparse.ArgumentParser(
@@ -257,7 +200,7 @@ def main():
             release=args.release
         )
         # read data from each granule and concatenate into dataframe
-        dataframes = [read_granule(g) for g in granules]
+        dataframes = [is2cv.io.read_granule(g) for g in granules]
         # skip event if no data
         if not dataframes:
             continue
