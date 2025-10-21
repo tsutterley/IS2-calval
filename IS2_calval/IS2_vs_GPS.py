@@ -10,18 +10,15 @@ Created on Wed Sep  5 13:36:08 2018
 @author: ben
 """
 
-import pointCollection as pc
-#from PointDatabase import ATL06_filters
-from ATL11.RDE import RDE
-import numpy as np
-import pickle
-import h5py
 import os
 import re
 import sys
+import h5py
+import pickle
 import argparse
-#from ATL11.pt_blockmedian import pt_blockmedian
-from PointDatabase import pt_blockmedian
+import numpy as np
+import pointCollection as pc
+from pointCollection import pt_blockmedian, RDE
 from sklearn.neighbors import KDTree
 
 # WGS84 semimajor and semiminor axes
