@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "IS2-calval"
+version = "0.0.1"
+description = "Utilities for the calibration and validation of ICESat-2 data"
+keywords = [
+    "ICESat-2",
+    "cal-val",
+    "calibration",
+    "validation"
+]
+authors = [
+    {name = "Tyler Sutterley"},
+    {email = "tsutterl@uw.edu"}
+]
+maintainers = [
+    {name = "IS2-calval contributors"}
+]
+license = {file = "LICENSE"}
+readme = {file = "README.md", content-type = "text/markdown"}
+
+requires-python = "~=3.6"
+dependencies = [
+    "future",
+    "h5py",
+    "lxml",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyproj",
+    "python-dateutil",
+    "scikit-learn",
+    "scipy>=1.10.1",
+    "timescale>=0.0.8",
+]
+
+classifiers=[
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.urls]
+Repository = "https://github.com/tsutterley/IS2-calval"
+Issues = "https://github.com/tsutterley/IS2-calval/issues"
+
+[project.optional-dependencies]
+
+[project.scripts]
+"tech_ref_events.py" = "IS2_calval.tech_ref_events:main" 
+
+[tool.setuptools.packages.find]
+
+[tool.pixi.workspace]
+authors = ["Tyler Sutterley <tsutterl@uw.edu>"]
+channels = ["conda-forge"]
+name = "IS2-calval"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+future = "*"
+h5py = "*"
+lxml = "*"
+matplotlib = "*"
+numpy = "*"
+pandas = "*"
+pyproj = "*"
+python-dateutil = "*"
+scikit-learn = "*"
+scipy = "*"
+timescale = "*"
+
+[tool.pixi.pypi-dependencies]
+IS2-calval = { path = ".", editable = true }
+icesat2-toolkit = "*"

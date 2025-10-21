@@ -173,6 +173,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a0/e3/59cd50310fc9b59512193629e1984c1f95e5c8ae6e5d8c69532ccc65a7fe/pycparser-2.23-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/52/bc/a5cff7f8c30d5f4c26a07dfb0bcda1176ab8b2de86dda3106c00a02ad787/pynacl-1.6.0-cp38-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/79/b3/561cd6afa959e9dd522af12acc4f803e8bab1bd0e383bffc5211721c5fcb/scp-0.15.0-py2.py3-none-any.whl
+      - pypi: ./
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
   sha256: fe51de6107f9edc7aa4f786a70f4a883943bc9d39b3bb7307c04c41410990726
@@ -643,6 +644,24 @@ packages:
   version: 2.2.1
   sha256: 2413bc441b376e5cd3f55bb5d364f973ad8bdd7bf87e53c79de3c11bf3feecc8
   requires_python: '>=3.6'
+- pypi: ./
+  name: is2-calval
+  version: 0.0.1
+  sha256: 5fd018dbe3f8d6a23a28ef72b2ca69a9703be69667b96601083b67c784200ad1
+  requires_dist:
+  - future
+  - h5py
+  - lxml
+  - matplotlib
+  - numpy
+  - pandas
+  - pyproj
+  - python-dateutil
+  - scikit-learn
+  - scipy>=1.10.1
+  - timescale>=0.0.8
+  requires_python: ~=3.6
+  editable: true
 - conda: https://conda.anaconda.org/conda-forge/noarch/joblib-1.5.2-pyhd8ed1ab_0.conda
   sha256: 6fc414c5ae7289739c2ba75ff569b79f72e38991d61eb67426a8a4b92f90462c
   md5: 4e717929cfa0d49cef92d911e31d0e90
