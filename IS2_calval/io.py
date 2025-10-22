@@ -12,7 +12,6 @@ import h5py
 import pathlib
 import numpy as np
 import pandas as pd
-import icesat2_toolkit as is2tk
 
 # variable mapping
 mapping = {}
@@ -36,6 +35,25 @@ mapping['ATL12'] = dict(
     swh = 'ssh_segments/heights/swh'
 )
 
+def find_beams(fileID, product='ATL12', pattern=r'gt\d[lr]'):
+    """
+    Find beam groups within a file
+    """
+    # list of beams
+    beams = []
+    # variable to check
+    val = mapping[product]['delta_time']
+    # read each input beam within the file
+    for gtx in [k for k in fileID.keys() if bool(re.match(pattern, k))]:
+        # check if subsetted beam contains time data
+        try:
+            fileID[gtx][val]
+        except KeyError:
+            pass
+        else:
+            beams.append(gtx)
+    return beams
+
 def read_granule(granule, **kwargs):
     """
     Reads a subset of variables from an ICESat-2 HDF5 file
@@ -50,13 +68,12 @@ def read_granule(granule, **kwargs):
     PRD, HEM, YYYYMMDDHHMMSS, RGT, CYC = rx.findall(granule.name).pop()
     # read data from granule and concatenate into dataframe
     dataframes = []
-    func = getattr(is2tk.io, PRD)
     # merge variable mapping
     field_mapping = mapping[PRD].copy()
     field_mapping.update(kwargs['field_mapping'])
     # read data from each beam
     with h5py.File(granule, 'r') as fileID:
-        beams = func.find_beams(fileID, KEEP=True)
+        beams = find_beams(fileID, product=PRD)
         for gtx in beams:
             # initialize dictionary for storing variables
             data = {}
