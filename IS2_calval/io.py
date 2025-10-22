@@ -32,6 +32,7 @@ mapping['ATL12'] = dict(
     n_pulse_seg = 'ssh_segments/heights/n_pulse_seg',
     n_ttl_photon = 'ssh_segments/stats/n_ttl_photon',
     near_sat_fract_seg = 'ssh_segments/stats/near_sat_fract_seg',
+    orbit_number = 'ssh_segments/stats/orbit_number',
     swh = 'ssh_segments/heights/swh'
 )
 
