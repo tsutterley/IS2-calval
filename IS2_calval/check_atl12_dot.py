@@ -11,8 +11,6 @@ import re
 import pathlib
 import argparse
 import numpy as np
-import pandas as pd
-import icesat2_toolkit as is2tk
 import IS2_calval as is2cv
 
 # PURPOSE: create argument parser
