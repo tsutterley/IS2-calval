@@ -27,6 +27,7 @@ Thumbs.db
 # Data files
 *.h5
 *.nc
+*.csv
 *.xlsx
 *.parquet
 

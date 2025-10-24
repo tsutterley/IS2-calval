@@ -1515,7 +1515,7 @@ packages:
 - pypi: ./
   name: is2-calval
   version: 0.0.1
-  sha256: 63d7e87fc0debed4956e1706a5971930eb64d26aacaeb37e3ac5dc80a7ec5d47
+  sha256: e48c335f738065355457564ef59ea6484274956f9a3ed1dda8e8cdfae3773615
   requires_dist:
   - future
   - h5py
