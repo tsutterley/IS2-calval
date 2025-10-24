@@ -59,7 +59,7 @@ def main():
     # skip if no data with extreme values
     if not np.any(mask):
         return
-    # filter dataframe to bounds around event
+    # filter dataframe to bounds
     df1 = df.loc[mask,:].reset_index(drop=True)
     # add file-level attributes
     # standard deviation
