@@ -50,6 +50,8 @@ def main():
     )
     # read ATL12 file
     df = is2cv.io.read_granule(args.infile, field_mapping=field_mapping)
+    # update RGT from orbit number
+    df['track'] = is2cv.io.orbit_number_to_track(df['orbit_number'])
     # compute dynamic ocean topographies
     df['h_ortho'] = df['h'] - (df['geoid_seg'] + df['geoid_free2mean_seg'])
     # filter to values greater than threshold
