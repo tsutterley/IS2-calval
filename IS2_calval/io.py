@@ -55,6 +55,14 @@ def find_beams(fileID, product='ATL12', pattern=r'gt\d[lr]'):
             beams.append(gtx)
     return beams
 
+def orbit_number_to_track(orbit_number: np.ndarray):
+    """
+    Convert orbit number to reference ground track (RGT)
+    """
+    # number of orbits per cycle
+    orbits_per_cycle = 1387
+    return np.mod(orbit_number - 201, orbits_per_cycle)
+
 def read_granule(granule, **kwargs):
     """
     Reads a subset of variables from an ICESat-2 HDF5 file
