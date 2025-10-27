@@ -31,10 +31,6 @@ dependencies = [
     "numpy",
     "pandas",
     "pyarrow",
-    "pyproj",
-    "python-dateutil",
-    "scikit-learn",
-    "scipy>=1.10.1",
 ]
 
 classifiers=[
@@ -63,6 +59,10 @@ all = [
     "geopandas",
     "LSsurf @ git+https://github.com/SmithB/LSsurf.git",
     "pointcollection @ git+https://github.com/SmithB/pointCollection.git",
+    "pyproj",
+    "python-dateutil",
+    "scikit-learn",
+    "scipy>=1.10.1",
     "sortedcontainers",
     "sparseqr @ git+https://github.com/yig/PySPQR.git",
     "timescale>=0.0.8",
@@ -92,19 +92,19 @@ version = "0.1.0"
 future = "*"
 h5py = "*"
 lxml = "*"
-matplotlib = "*"
+matplotlib-base = "*"
 numpy = "*"
 pandas = "*"
 pyarrow = "*"
-pyproj = "*"
-python-dateutil = "*"
-scikit-learn = "*"
-scipy = "*"
 
 [tool.pixi.feature.all.dependencies]
 cython = "*"
 gdal = "*"
 geopandas = "*"
+pyproj = "*"
+python-dateutil = "*"
+scikit-learn = "*"
+scipy = "*"
 sortedcontainers = "*"
 suitesparse = "*"
 timescale = "*"

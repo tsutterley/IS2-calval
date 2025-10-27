@@ -88,7 +88,11 @@ def read_granule(granule, **kwargs):
             data = {}
             # extract variables from HDF5 file
             for key,val in field_mapping.items():
-                data[key] = fileID[gtx][val][:]
+                # attempt to read variable
+                try:
+                    data[key] = fileID[gtx][val][:]
+                except KeyError:
+                    continue
                 # apply fill values
                 if hasattr(fileID[gtx][val], 'fillvalue'):
                     fv = fileID[gtx][val].fillvalue
