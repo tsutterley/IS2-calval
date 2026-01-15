@@ -5,6 +5,7 @@ Written by Tyler Sutterley (10/2025)
 Reads a subset of variables from an ICESat-2 HDF5 file
 
 UPDATE HISTORY:
+    Updated 01/2026: added some basic ATL03 functions
     Written 10/2025
 """
 import re
@@ -15,6 +16,13 @@ import pandas as pd
 
 # variable mapping
 mapping = {}
+mapping['ATL03'] = dict(
+    delta_time='geophys_corr/delta_time',
+    reference_photon_lon='geolocation/reference_photon_lon',
+    reference_photon_lat='geolocation/reference_photon_lat',
+    geoid = 'geophys_corr/geoid',
+    geoid_free2mean = 'geophys_corr/geoid_free2mean',
+)
 mapping['ATL12'] = dict(
     delta_time = 'ssh_segments/delta_time',
     longitude = 'ssh_segments/longitude',
@@ -36,7 +44,7 @@ mapping['ATL12'] = dict(
     swh = 'ssh_segments/heights/swh'
 )
 
-def find_beams(fileID, product='ATL12', pattern=r'gt\d[lr]'):
+def find_beams(fid, product='ATL12', pattern=r'gt\d[lr]'):
     """
     Find beam groups within a file
     """
@@ -45,10 +53,10 @@ def find_beams(fileID, product='ATL12', pattern=r'gt\d[lr]'):
     # variable to check
     val = mapping[product]['delta_time']
     # read each input beam within the file
-    for gtx in [k for k in fileID.keys() if bool(re.match(pattern, k))]:
+    for gtx in [k for k in fid.keys() if bool(re.match(pattern, k))]:
         # check if subsetted beam contains time data
         try:
-            fileID[gtx][val]
+            fid[gtx][val]
         except KeyError:
             pass
         else:
@@ -81,8 +89,8 @@ def read_granule(granule, **kwargs):
     field_mapping = mapping[PRD].copy()
     field_mapping.update(kwargs['field_mapping'])
     # read data from each beam
-    with h5py.File(granule, 'r') as fileID:
-        beams = find_beams(fileID, product=PRD)
+    with h5py.File(granule, 'r') as fid:
+        beams = find_beams(fid, product=PRD)
         for gtx in beams:
             # initialize dictionary for storing variables
             data = {}
@@ -90,15 +98,15 @@ def read_granule(granule, **kwargs):
             for key,val in field_mapping.items():
                 # attempt to read variable
                 try:
-                    data[key] = fileID[gtx][val][:]
+                    data[key] = fid[gtx][val][:]
                 except KeyError:
                     continue
                 # apply fill values
-                if hasattr(fileID[gtx][val], 'fillvalue'):
-                    fv = fileID[gtx][val].fillvalue
+                if hasattr(fid[gtx][val], 'fillvalue'):
+                    fv = fid[gtx][val].fillvalue
                     data[key] = np.ma.masked_equal(data[key], fv)
             # get derived variables
-            atlas_spot_number = fileID[gtx].attrs['atlas_spot_number']
+            atlas_spot_number = fid[gtx].attrs['atlas_spot_number']
             data['atlas_spot_number'] = int(atlas_spot_number)
             data['ground_track'] = gtx
             data['track'] = int(RGT)
@@ -109,3 +117,59 @@ def read_granule(granule, **kwargs):
     df = pd.concat(dataframes, ignore_index=True)
     # return the dataframe
     return df
+
+def reference_photon_height(granule, gtx, minimum_weight = 0):
+    """
+    Extract the height of a height of a reference photon
+    """
+    # open ATL03 granule
+    with h5py.File(granule, 'r') as fid:
+        # extract index and mapping variables
+        reference_photon_index = fid[gtx]['geolocation']['reference_photon_index'][:] - 1
+        ph_index_beg = fid[gtx]['geolocation']['ph_index_beg'][:] - 1
+        # mask for valid segments
+        valid = reference_photon_index >= 0
+        # calculate photon index (convert to 0-based index)
+        photon_index = ph_index_beg[valid] + reference_photon_index[valid]
+        # extract output heights
+        h_ph = fid[gtx]['heights']['h_ph'][:]
+        height = np.full_like(ph_index_beg, np.nan, dtype=h_ph.dtype)
+        height[valid] = h_ph[photon_index]
+        # verify quality and weight
+        quality_ph = fid[gtx]['heights']['quality_ph'][:]
+        weight_ph = fid[gtx]['heights']['weight_ph'][:]
+        # apply quality and weight mask
+        height[valid] = np.where(
+            ((quality_ph[photon_index] == 0) & 
+            (weight_ph[photon_index] >= minimum_weight)),
+            height[valid], np.nan
+        )
+    # return the reference photon heights
+    return height
+
+def is_surface_type(granule, gtx, column=1, exclusive=True):
+    """
+    Check if an ATL03 segment is a surface type
+    """
+    # open ATL03 granule
+    with h5py.File(granule, 'r') as fid:
+        surf_type = fid[gtx]['geolocation']['surf_type'][:].astype(bool)
+    # initialize masks
+    ds_time, ds_surf_type = surf_type.shape
+    not_type = np.zeros((ds_time), dtype=bool)
+    # iterate over surface types
+    # 0: land
+    # 1: ocean
+    # 2: sea ice
+    # 3: land ice
+    # 4: inland water
+    for i in range(ds_surf_type):
+        if i == column:
+            is_type = surf_type[:, i].copy()
+        else:
+            not_type |= surf_type[:, i]
+    # return mask for surface type
+    if exclusive:
+        return is_type & np.logical_not(not_type)
+    else:
+        return is_type

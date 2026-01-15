@@ -69,6 +69,7 @@ all = [
 ]
 
 [project.scripts]
+"check_atl03_pairs.py" = "IS2_calval.check_atl03_pairs:main"
 "check_atl12_dot.py" = "IS2_calval.check_atl12_dot:main" 
 "check_atl12_pairs.py" = "IS2_calval.check_atl12_pairs:main"
 "GPS_vs_ATM.py" = "IS2_calval.GPS_vs_ATM:main" 
