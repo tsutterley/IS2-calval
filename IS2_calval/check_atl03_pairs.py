@@ -47,7 +47,7 @@ def main():
     rx = re.compile(pattern, re.VERBOSE)
     PRD, YYYYMMDDHHMMSS, RGT, CYC, GRAN, RL, VERS = rx.findall(granule).pop()
     # minimum weight for reference photon selection
-    minimum_weight = 200 if (int(RL) < 7) else 6000
+    minimum_weight = 220 if (int(RL) < 7) else 2400
     # additional variables to read
     field_mapping = dict(
         segment_id='geolocation/segment_id',
