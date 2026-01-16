@@ -47,6 +47,20 @@ mapping['ATL12'] = dict(
 def find_beams(fid, product='ATL12', pattern=r'gt\d[lr]'):
     """
     Find beam groups within a file
+
+    Parameters
+    ----------
+    fid: h5py.File
+        Open HDF5 file object
+    product: str
+        ICESat-2 product
+    pattern: str
+        Regular expression pattern for identifying beams
+
+    Returns
+    -------
+    beams: list
+        List of beam groups within the file
     """
     # list of beams
     beams = []
@@ -66,6 +80,11 @@ def find_beams(fid, product='ATL12', pattern=r'gt\d[lr]'):
 def orbit_number_to_track(orbit_number: np.ndarray):
     """
     Convert orbit number to reference ground track (RGT)
+
+    Parameters
+    ----------
+    orbit_number: np.ndarray
+        Orbit number(s) to convert
     """
     # number of orbits per cycle
     orbits_per_cycle = 1387
@@ -74,6 +93,18 @@ def orbit_number_to_track(orbit_number: np.ndarray):
 def read_granule(granule, **kwargs):
     """
     Reads a subset of variables from an ICESat-2 HDF5 file
+
+    Parameters
+    ----------
+    granule: str or pathlib.Path
+        Path to the ICESat-2 granule
+    field_mapping: dict
+        Dictionary mapping of variable names to HDF5 paths
+    
+    Returns
+    -------
+    df: pandas.DataFrame
+        DataFrame of variables from the granule
     """
     kwargs.setdefault('field_mapping', {})
     # verify path to granule
@@ -121,6 +152,20 @@ def read_granule(granule, **kwargs):
 def reference_photon_height(granule, gtx, minimum_weight = 0):
     """
     Extract the height of a height of a reference photon
+
+    Parameters
+    ----------
+    granule: str or pathlib.Path
+        Path to the ATL03 granule
+    gtx: str
+        Beam group within the granule
+    minimum_weight: int
+        Minimum weight for reference photon selection
+
+    Returns
+    -------
+    height: np.ndarray
+        Height of the reference photons
     """
     # open ATL03 granule
     with h5py.File(granule, 'r') as fid:
@@ -150,6 +195,27 @@ def reference_photon_height(granule, gtx, minimum_weight = 0):
 def is_surface_type(granule, gtx, column=1, exclusive=True):
     """
     Check if an ATL03 segment is a surface type
+
+    Parameters
+    ----------
+    granule: str or pathlib.Path
+        Path to the ATL03 granule
+    gtx: str
+        Beam group within the granule
+    column: int or list
+        Column index or list of indices for surface type
+        0: land
+        1: ocean
+        2: sea ice
+        3: land ice
+        4: inland water
+    exclusive: bool
+        Only return segments that are exclusively the specified type(s)
+
+    Returns
+    -------
+    is_type: np.ndarray
+        Boolean mask of segments
     """
     # open ATL03 granule
     with h5py.File(granule, 'r') as fid:
@@ -157,6 +223,9 @@ def is_surface_type(granule, gtx, column=1, exclusive=True):
     # initialize masks
     ds_time, ds_surf_type = surf_type.shape
     not_type = np.zeros((ds_time), dtype=bool)
+    # convert column to list if integer
+    if isinstance(column, int):
+        column = [column]
     # iterate over surface types
     # 0: land
     # 1: ocean
@@ -164,7 +233,7 @@ def is_surface_type(granule, gtx, column=1, exclusive=True):
     # 3: land ice
     # 4: inland water
     for i in range(ds_surf_type):
-        if i == column:
+        if i in column:
             is_type = surf_type[:, i].copy()
         else:
             not_type |= surf_type[:, i]
