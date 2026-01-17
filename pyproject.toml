@@ -57,18 +57,19 @@ Issues = "https://github.com/tsutterley/IS2-calval/issues"
 all = [
     "gdal",
     "geopandas",
-    "LSsurf @ git+https://github.com/SmithB/LSsurf.git",
     "pointcollection @ git+https://github.com/SmithB/pointCollection.git",
     "pyproj",
     "python-dateutil",
     "scikit-learn",
     "scipy>=1.10.1",
     "sortedcontainers",
-    "sparseqr @ git+https://github.com/yig/PySPQR.git",
+    "sparseqr",
     "timescale>=0.0.8",
 ]
+dev = ["flake8", "gh", "pytest>=4.6", "pytest-cov", "pytest-xdist"]
 
 [project.scripts]
+"check_atl03_pairs.py" = "IS2_calval.check_atl03_pairs:main"
 "check_atl12_dot.py" = "IS2_calval.check_atl12_dot:main" 
 "check_atl12_pairs.py" = "IS2_calval.check_atl12_pairs:main"
 "GPS_vs_ATM.py" = "IS2_calval.GPS_vs_ATM:main" 
@@ -79,6 +80,42 @@ all = [
 
 [tool.setuptools.packages.find]
 
+[tool.ruff]
+line-length = 80
+indent-width = 4
+exclude = [
+    ".git",
+    ".pixi",
+    "build",
+    "doc",
+    "run",
+    "test",
+]
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # ruff-specific
+    "RUF",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = false
+
 [tool.pixi.workspace]
 authors = ["Tyler Sutterley <tsutterl@uw.edu>"]
 channels = ["conda-forge"]
@@ -87,6 +124,11 @@ platforms = ["linux-64"]
 version = "0.1.0"
 
 [tool.pixi.tasks]
+
+[tool.pixi.feature.dev.tasks.lint]
+args = [ { "arg" = "flags", "default" = "--select=E9,F63,F7,F82 --show-source" }, { "arg" = "test", "default" = "." } ]
+cmd = "flake8 {{ test }} --count {{ flags }} --statistics --extend-exclude 'build/,run/,*.ipynb_checkpoints/,.pixi/'"
+description = "Run flake8 to check for compilation errors"
 
 [tool.pixi.dependencies]
 future = "*"
@@ -111,7 +153,6 @@ timescale = "*"
 
 [tool.pixi.pypi-dependencies]
 IS2-calval = { path = ".", editable = true }
-icesat2-toolkit = "*"
 
 [tool.pixi.feature.all.pypi-dependencies]
 IS2-calval = { path = ".", editable = true, extras = ["all"] }
@@ -119,3 +160,4 @@ IS2-calval = { path = ".", editable = true, extras = ["all"] }
 [tool.pixi.environments]
 default = { solve-group = "default" }
 all = { features = ["all"], solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }

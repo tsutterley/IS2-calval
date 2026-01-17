@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-u"""
+"""
 utilities.py
 Written by Tyler Sutterley (10/2025)
 Download and management utilities for syncing time and auxiliary files
@@ -11,6 +11,7 @@ PYTHON DEPENDENCIES:
 UPDATE HISTORY:
     Written 10/2025
 """
+
 from __future__ import annotations
 
 import io
@@ -27,6 +28,7 @@ import zipfile
 import importlib
 import posixpath
 import lxml.etree
+
 if sys.version_info[0] == 2:
     from urllib import quote_plus
     from cookielib import CookieJar
@@ -35,6 +37,7 @@ else:
     from urllib.parse import quote_plus
     from http.cookiejar import CookieJar
     import urllib.request as urllib2
+
 
 # PURPOSE: get absolute path within a package from a relative path
 def get_data_path(relpath: list | str | pathlib.Path):
@@ -55,11 +58,10 @@ def get_data_path(relpath: list | str | pathlib.Path):
     elif isinstance(relpath, (str, pathlib.Path)):
         return filepath.joinpath(relpath)
 
+
 def import_dependency(
-        name: str,
-        extra: str = "",
-        raise_exception: bool = False
-    ):
+    name: str, extra: str = "", raise_exception: bool = False
+):
     """
     Import an optional dependency
 
@@ -84,7 +86,7 @@ def import_dependency(
     assert isinstance(name, str), msg
     # default error if module cannot be imported
     err = f"Missing optional dependency '{name}'. {extra}"
-    module = type('module', (), {})
+    module = type("module", (), {})
     # try to import the module
     try:
         module = importlib.import_module(name)
@@ -96,11 +98,12 @@ def import_dependency(
     # return the module
     return module
 
+
 # PURPOSE: get the sheet names from an Excel file
 def get_excel_sheet_names(xls_file=None, pattern=None):
     """
     Get the sheet names from an Excel file
-    
+
     Parameters
     ----------
     xls_file: str, pathlib.Path or BytesIO, default None
@@ -110,37 +113,39 @@ def get_excel_sheet_names(xls_file=None, pattern=None):
     """
     # compile xml parsers for lxml
     parser = lxml.etree.XMLParser(recover=True, remove_blank_text=True)
-    with zipfile.ZipFile(xls_file, 'r') as z:
+    with zipfile.ZipFile(xls_file, "r") as z:
         tree = lxml.etree.parse(z.open("xl/workbook.xml"), parser)
     # get the XML root
     root = tree.getroot()
     # find all the sheet names
-    sheets = root.find('sheets', root.nsmap)
-    names = [s.get('name') for s in sheets.findall('sheet', root.nsmap)]
+    sheets = root.find("sheets", root.nsmap)
+    names = [s.get("name") for s in sheets.findall("sheet", root.nsmap)]
     # filter names by pattern
     if pattern is not None:
         names = [name for name in names if re.search(pattern, name, re.I)]
     # return the list of sheet names
     return names
 
+
 # PURPOSE: zenodo record for the tech ref table
-def get_zenodo_url(zenodo_record='16283560'):
+def get_zenodo_url(zenodo_record="16283560"):
     """
     Get the zenodo url and checksum for a record
-    
+
     Parameters
     ----------
     zenodo_record: str, default '16283560'
         zenodo record number
     """
-    zenodo = 'https://zenodo.org/api'
-    records_api = f'{zenodo}/records/{zenodo_record}'
-    version_record = from_json(records_api)['id']
-    deposit_api = f'{zenodo}/deposit/depositions/{version_record}/files'
+    zenodo = "https://zenodo.org/api"
+    records_api = f"{zenodo}/records/{zenodo_record}"
+    version_record = from_json(records_api)["id"]
+    deposit_api = f"{zenodo}/deposit/depositions/{version_record}/files"
     response = from_json(deposit_api)
-    download = response[0]['links']['download']
-    checksum = response[0]['checksum']
+    download = response[0]["links"]["download"]
+    checksum = response[0]["checksum"]
     return download, checksum
+
 
 # PURPOSE: recursively split a url path
 def url_split(s: str):
@@ -153,31 +158,31 @@ def url_split(s: str):
         url string
     """
     head, tail = posixpath.split(s)
-    if head in ('http:','https:','ftp:','s3:'):
-        return s,
-    elif head in ('', posixpath.sep):
-        return tail,
+    if head in ("http:", "https:", "ftp:", "s3:"):
+        return (s,)
+    elif head in ("", posixpath.sep):
+        return (tail,)
     return url_split(head) + (tail,)
 
+
 def _create_default_ssl_context() -> ssl.SSLContext:
-    """Creates the default SSL context
-    """
+    """Creates the default SSL context"""
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     _set_ssl_context_options(context)
     context.options |= ssl.OP_NO_COMPRESSION
     return context
 
+
 def _create_ssl_context_no_verify() -> ssl.SSLContext:
-    """Creates an SSL context for unverified connections
-    """
+    """Creates an SSL context for unverified connections"""
     context = _create_default_ssl_context()
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     return context
 
+
 def _set_ssl_context_options(context: ssl.SSLContext) -> None:
-    """Sets the default options for the SSL context
-    """
+    """Sets the default options for the SSL context"""
     if sys.version_info >= (3, 10) or ssl.OPENSSL_VERSION_INFO >= (1, 1, 0, 7):
         context.minimum_version = ssl.TLSVersion.TLSv1_2
     else:
@@ -186,17 +191,19 @@ def _set_ssl_context_options(context: ssl.SSLContext) -> None:
         context.options |= ssl.OP_NO_TLSv1
         context.options |= ssl.OP_NO_TLSv1_1
 
+
 # default ssl context
 _default_ssl_context = _create_ssl_context_no_verify()
 
+
 # PURPOSE: download a file from a http host
 def from_http(
-        HOST: str | list,
-        timeout: int | None = None,
-        context = _default_ssl_context,
-        hash: str = '',
-        chunk: int = 16384,
-    ):
+    HOST: str | list,
+    timeout: int | None = None,
+    context=_default_ssl_context,
+    hash: str = "",
+    chunk: int = 16384,
+):
     """
     Download a file from a http host
 
@@ -229,7 +236,7 @@ def from_http(
         request = urllib2.Request(posixpath.join(*HOST))
         response = urllib2.urlopen(request, timeout=timeout, context=context)
     except (urllib2.HTTPError, urllib2.URLError) as exc:
-        raise Exception('Download error from {0}'.format(posixpath.join(*HOST)))
+        raise Exception("Download error from {0}".format(posixpath.join(*HOST)))
     else:
         # copy remote file contents to bytesIO object
         remote_buffer = io.BytesIO()
@@ -245,12 +252,13 @@ def from_http(
         remote_buffer.seek(0)
         return remote_buffer
 
+
 # PURPOSE: load a JSON response from a http host
 def from_json(
-        HOST: str | list,
-        timeout: int | None = None,
-        context: ssl.SSLContext = _default_ssl_context
-    ) -> dict:
+    HOST: str | list,
+    timeout: int | None = None,
+    context: ssl.SSLContext = _default_ssl_context,
+) -> dict:
     """
     Load a JSON response from a http host
 
@@ -270,14 +278,14 @@ def from_json(
     try:
         # Create and submit request for JSON response
         request = urllib2.Request(posixpath.join(*HOST))
-        request.add_header('Accept', 'application/json')
+        request.add_header("Accept", "application/json")
         response = urllib2.urlopen(request, timeout=timeout, context=context)
     except urllib2.HTTPError as exc:
         logging.debug(exc.code)
         raise RuntimeError(exc.reason) from exc
     except urllib2.URLError as exc:
         logging.debug(exc.reason)
-        msg = 'Load error from {0}'.format(posixpath.join(*HOST))
+        msg = "Load error from {0}".format(posixpath.join(*HOST))
         raise Exception(msg) from exc
     else:
         # load JSON response
