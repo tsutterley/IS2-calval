@@ -6,6 +6,7 @@ Reads a subset of variables from an ICESat-2 HDF5 file
 
 UPDATE HISTORY:
     Updated 01/2026: added some basic ATL03 functions
+        added option to use surface type instead of column index
     Written 10/2025
 """
 
@@ -203,7 +204,7 @@ def reference_photon_height(granule, gtx, minimum_weight=0):
     return height
 
 
-def is_surface_type(granule, gtx, column=1, exclusive=True):
+def is_surface_type(granule, gtx, surface_type=None, column=1, exclusive=True):
     """
     Check if an ATL03 segment is a surface type
 
@@ -213,8 +214,10 @@ def is_surface_type(granule, gtx, column=1, exclusive=True):
         Path to the ATL03 granule
     gtx: str
         Beam group within the granule
-    column: int or list
-        Column index or list of indices for surface type
+    surface_type: str or None
+        Surface type to check
+    column: int
+        Column index for surface type
         0: land
         1: ocean
         2: sea ice
@@ -234,17 +237,18 @@ def is_surface_type(granule, gtx, column=1, exclusive=True):
     # initialize masks
     ds_time, ds_surf_type = surf_type.shape
     not_type = np.zeros((ds_time), dtype=bool)
-    # convert column to list if integer
-    if isinstance(column, int):
-        column = [column]
-    # iterate over surface types
+    # get column index for surface type
+    if surface_type is not None:
+        columns = ["land", "ocean", "sea_ice", "land_ice", "inland_water"]
+        column = columns.index(surface_type)
+    # iterate over ATL03 surface type columns
     # 0: land
     # 1: ocean
     # 2: sea ice
     # 3: land ice
     # 4: inland water
     for i in range(ds_surf_type):
-        if i in column:
+        if i == column:
             is_type = surf_type[:, i].copy()
         else:
             not_type |= surf_type[:, i]
