@@ -5,6 +5,8 @@ Written by Tyler Sutterley (01/2026)
 Check differences between ICESat-2 ATL03 beam pair heights
 
 UPDATE HISTORY:
+    Updated 01/2026: added option for running exclusively for surface type
+        added option to set minimum weight for reference photon selection
     Written 01/2026
 """
 
@@ -32,6 +34,20 @@ def arguments():
         "infile", type=pathlib.Path, help="ICESat-2 ATL03 file to run"
     )
     parser.add_argument(
+        "--exclusive",
+        "-e",
+        default=False,
+        action="store_true",
+        help="Run exclusively for the ocean surface type",
+    )
+    parser.add_argument(
+        "--weight",
+        "-w",
+        type=int,
+        default=2400,
+        help="Minimum weight for reference photon selection",
+    )
+    parser.add_argument(
         "--threshold",
         "-t",
         type=float,
@@ -54,8 +70,6 @@ def main():
     pattern = r"(ATL\d{2})_(\d{14})_(\d{4})(\d{2})(\d{2})_(\d{3})_(\d{2}).h5$"
     rx = re.compile(pattern, re.VERBOSE)
     PRD, YYYYMMDDHHMMSS, RGT, CYC, GRAN, RL, VERS = rx.findall(granule).pop()
-    # minimum weight for reference photon selection
-    minimum_weight = 220 if (int(RL) < 7) else 2400
     # additional variables to read
     field_mapping = dict(
         segment_id="geolocation/segment_id",
@@ -72,10 +86,12 @@ def main():
         df1 = df[df.ground_track == group]
         # extract reference photon height
         df1["reference_photon_height"] = is2cv.io.reference_photon_height(
-            args.infile, group, minimum_weight=minimum_weight
+            args.infile, group, minimum_weight=args.weight
         )
         # reduce to surface type
-        is_type = is2cv.io.is_surface_type(args.infile, group)
+        is_type = is2cv.io.is_surface_type(
+            args.infile, group, surface_type="ocean", exclusive=args.exclusive
+        )
         df1.loc[~is_type, "reference_photon_height"] = np.nan
         # compute dynamic ocean topographies
         df.loc[df.ground_track == group, "h_ortho"] = df1[
